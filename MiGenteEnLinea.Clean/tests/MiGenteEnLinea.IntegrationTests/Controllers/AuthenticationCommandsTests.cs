@@ -357,7 +357,7 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
         result.Should().NotBeNull();
-        result!["message"].Should().Contain("correo de activación");
+        result!["message"].Should().Contain("Email de activación");
     }
 
     [Fact]
@@ -535,7 +535,10 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         result.Should().NotBeNull();
         result.Should().ContainKey("id");
-        var profileInfoId = Convert.ToInt32(result!["id"]);
+        
+        // JsonElement requires GetInt32() instead of Convert.ToInt32()
+        var idElement = (System.Text.Json.JsonElement)result!["id"];
+        var profileInfoId = idElement.GetInt32();
         profileInfoId.Should().BeGreaterThan(0);
 
         // Verify in database

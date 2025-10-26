@@ -38,8 +38,10 @@ public class CredencialRepository : Repository<Credencial>, ICredencialRepositor
     /// </summary>
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
+        // Normalize email before query to avoid EF Core translation issues with Value Object
+        var normalizedEmail = Email.CreateUnsafe(email.ToLowerInvariant());
         return await _dbSet
-            .AnyAsync(c => c.Email.Value.ToLower() == email.ToLower(), cancellationToken);
+            .AnyAsync(c => c.Email == normalizedEmail, cancellationToken);
     }
 
     /// <summary>

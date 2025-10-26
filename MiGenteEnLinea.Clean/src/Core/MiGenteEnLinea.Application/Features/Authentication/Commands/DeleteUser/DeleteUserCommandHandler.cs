@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MiGenteEnLinea.Application.Common.Interfaces;
@@ -8,18 +9,21 @@ namespace MiGenteEnLinea.Application.Features.Authentication.Commands.DeleteUser
 /// <summary>
 /// Handler para DeleteUserCommand.
 /// Implementa SOFT DELETE marcando el usuario como inactivo.
-/// RÉPLICA EXACTA de LoginService.borrarUsuario() del Legacy.
+/// SINCRONIZA con Identity y Legacy Credenciales.
 /// </summary>
 public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
 {
     private readonly IApplicationDbContext _context;
+    private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<DeleteUserCommandHandler> _logger;
 
     public DeleteUserCommandHandler(
         IApplicationDbContext context,
+        UserManager<IdentityUser> userManager,
         ILogger<DeleteUserCommandHandler> logger)
     {
         _context = context;
+        _userManager = userManager;
         _logger = logger;
     }
 
@@ -28,36 +32,56 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
         try
         {
             // ================================================================================
-            // LÓGICA LEGACY: LoginService.borrarUsuario()
+            // 1. DESACTIVAR EN IDENTITY (Primary)
             // ================================================================================
-            // Legacy: db.Credenciales.Where(a => a.userID == userID && a.id == credencialID).FirstOrDefault()
-            // Legacy: db.Credenciales.Remove(result) - HARD DELETE
+            var identityUser = await _userManager.FindByIdAsync(request.UserID);
+            
+            if (identityUser != null)
+            {
+                // Desactivar en Identity
+                identityUser.LockoutEnabled = true;
+                identityUser.LockoutEnd = DateTimeOffset.MaxValue; // Lock permanently
+                
+                var identityResult = await _userManager.UpdateAsync(identityUser);
+                
+                if (!identityResult.Succeeded)
+                {
+                    _logger.LogWarning(
+                        "No se pudo desactivar usuario en Identity. UserID: {UserID}, Errores: {Errors}",
+                        request.UserID,
+                        string.Join(", ", identityResult.Errors.Select(e => e.Description)));
+                }
+                else
+                {
+                    _logger.LogInformation("Usuario desactivado en Identity. UserID: {UserID}", request.UserID);
+                }
+            }
 
+            // ================================================================================
+            // 2. DESACTIVAR EN LEGACY CREDENCIALES (Compatibility)
+            // ================================================================================
             var credencial = await _context.Credenciales
                 .FirstOrDefaultAsync(c => c.UserId == request.UserID && c.Id == request.CredencialID, cancellationToken);
 
             if (credencial == null)
             {
                 _logger.LogWarning(
-                    "Intento de eliminar credencial inexistente. UserID: {UserID}, CredencialID: {CredencialID}",
+                    "Credencial Legacy no encontrada. UserID: {UserID}, CredencialID: {CredencialID}",
                     request.UserID,
                     request.CredencialID);
 
-                return false;
+                // Si existe en Identity, consideramos exitoso
+                return identityUser != null;
             }
 
-            // ================================================================================
-            // MEJORA vs Legacy: SOFT DELETE en lugar de HARD DELETE
-            // ================================================================================
-            // Legacy usaba Remove() que borraba físicamente el registro
-            // Clean usa Desactivar() que marca Activo = false
+            // Desactivar en Legacy
             credencial.Desactivar();
 
-            // Guardar cambios (interceptor actualizará ModifiedAt automáticamente)
+            // Guardar cambios en Legacy
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Usuario eliminado (soft delete) exitosamente. UserID: {UserID}, CredencialID: {CredencialID}",
+                "Usuario eliminado (soft delete) exitosamente en Identity y Legacy. UserID: {UserID}, CredencialID: {CredencialID}",
                 request.UserID,
                 request.CredencialID);
 

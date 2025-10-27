@@ -3658,7 +3658,7 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
 
                     b.HasKey("EmpleadoId");
 
-                    b.ToTable("Empleado");
+                    b.ToTable("Empleado", (string)null);
                 });
 
             modelBuilder.Entity("MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated.Remuneracione", b =>

@@ -131,7 +131,7 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
     public virtual DbSet<Domain.Entities.Empleados.Empleado> Empleados { get; set; }
 
     // Legacy entity (Generated - no DDD refactoring needed for simple tables)
-    public virtual DbSet<Remuneracione> Remuneraciones { get; set; }
+    // public virtual DbSet<Remuneracione> Remuneraciones { get; set; } // Legacy entity, commented to avoid EF Core mapping conflict
 
     // Legacy scaffolded entity (kept for reference)
     // public virtual DbSet<EmpleadorRecibosDetalle> EmpleadorRecibosDetallesLegacy { get; set; }
@@ -398,6 +398,7 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.PlanesContratista>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.PlanesEmpleadore>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Provincia>();
+        modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Remuneracione>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Sectore>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Servicio>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Suscripcione>();

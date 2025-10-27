@@ -22,8 +22,22 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Exclude backup folder from compilation -->
+  <ItemGroup>
+    <Compile Remove="Backup_Old_Tests\**" />
+    <EmbeddedResource Remove="Backup_Old_Tests\**" />
+    <None Remove="Backup_Old_Tests\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Presentation\MiGenteEnLinea.API\MiGenteEnLinea.API.csproj" />
+  </ItemGroup>
+
+  <!-- Copy appsettings.Testing.json to output directory -->
+  <ItemGroup>
+    <None Update="appsettings.Testing.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

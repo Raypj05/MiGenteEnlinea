@@ -54,11 +54,18 @@ This workspace provides specialized prompts for different AI agents:
 └── ddd-migration-agent.md                  # DDD migration workflow (coming soon)
 ```
 
-**🚀 CURRENT FOCUS:** Backend 100% Complete - Testing & Gap Closure
-**📄 Estado Actual:** Backend completado (123 endpoints REST), Testing en progreso
-**📊 Progress:** 19/28 GAPS completados (68%), Coverage ~45% (target 80%+)
-**📋 Reporte Principal:** `BACKEND_100_COMPLETE_VERIFIED.md`
-**📚 Documentación Completa:** `MiGenteEnLinea.Clean/INDICE_COMPLETO_DOCUMENTACION.md` (**121 archivos .md** organizados en 12 categorías)
+**🚀 CURRENT FOCUS:** Identity Integration + Robust Integration Testing with Real Database
+**📄 Estado Actual:** Backend 100% completo (123 endpoints), Testing infrastructure configurado con DB real
+**📊 Progress:** 19/28 GAPS completados (68%), Testing: AuthController flow tests en desarrollo activo
+**🎯 Testing Strategy:** Real database integration tests → Identify app errors → Fix directly in application
+**🔧 Branch Activo:** `feature/integration-tests-rewrite`
+**📋 Testing Approach:**
+
+- ✅ Phase 1: Configure real database connection in IntegrationTests project
+- 🔄 Phase 2: Create AuthController flow tests (registration, login, activation) - IN PROGRESS
+- ⏳ Phase 3: Expand to all Features (Empleadores, Contratistas, Empleados, etc.)
+- ⏳ Phase 4: Complete end-to-end user flows
+  **📚 Documentación Completa:** `MiGenteEnLinea.Clean/INDICE_COMPLETO_DOCUMENTACION.md` (**121 archivos .md** organizados en 12 categorías)
 
 ---
 
@@ -582,9 +589,12 @@ ReadModels/      → VistaPerfil, VistaEmpleado, VistaContratista, etc.
 
 ---
 
-#### ⚠️ Phase 6: Gap Closure - 68% COMPLETADO (19/28 GAPS)
+#### 🔄 Phase 6: Gap Closure + Identity Integration - 68% COMPLETADO (19/28 GAPS)
 
-**Reporte:** `GAPS_AUDIT_COMPLETO_FINAL.md`
+**Reportes:**
+
+- `GAPS_AUDIT_COMPLETO_FINAL.md` - 28 GAPS auditados
+- `INTEGRATION_TESTS_FINAL_STATUS_REPORT.md` - Estado testing (218 errores → reescritura)
 
 **✅ GAPS Completados (19):**
 
@@ -627,97 +637,282 @@ ReadModels/      → VistaPerfil, VistaEmpleado, VistaContratista, etc.
 
 ---
 
-#### 🔄 Phase 7: Testing & Quality - EN PROGRESO
+#### 🔄 Phase 7: Testing & Quality - 🚧 EN DESARROLLO ACTIVO
 
-**Reporte:** `INTEGRATION_TESTS_SETUP_REPORT.md`
+**Reportes:**
 
-**Proyectos de Testing:**
+- `INTEGRATION_TESTS_FINAL_STATUS_REPORT.md` - Estado actual (218 errores identificados, estrategia ajustada)
+- `GAPS_AUDIT_COMPLETO_FINAL.md` - 28 GAPS auditados (19 completos, 68%)
+
+**Estado Actual (Branch: feature/integration-tests-rewrite):**
 
 ```
-tests/
-├── MiGenteEnLinea.Infrastructure.Tests/  ⚠️ Configurado (necesita correcciones)
-└── MiGenteEnLinea.IntegrationTests/      ⚠️ Configurado (TestWebApplicationFactory)
+Branch: feature/integration-tests-rewrite (activo)
+Strategy: Real Database Integration Tests (no mocks)
+Current Focus: AuthController complete flow testing
+Database: db_a9f8ff_migente (REAL database connection)
+Approach: Test → Find Bugs → Fix in Application Layer
 ```
 
-**✅ Completado:**
+**🎯 Testing Philosophy:**
 
-- ✅ TestWebApplicationFactory con mocks
-- ✅ TestDataSeeder (datos de prueba)
-- ✅ IntegrationTestHelper (utilidades)
-- ✅ 58 tests estructurados en 3 suites:
-  - AuthenticationTests
-  - EmpleadoresTests
-  - ContratistasTests
+1. **Real Database First:** Tests use actual SQL Server database to catch real-world issues
+2. **Flow-Based Testing:** Complete user flows (register → activate → login) not isolated unit tests
+3. **Identity Integration:** Migrating to ASP.NET Core Identity while maintaining Legacy compatibility
+4. **Error-Driven Development:** Tests identify application bugs, fixes go to source code
+5. **Incremental Expansion:** Auth complete → Empleadores → Contratistas → Empleados → etc.
 
-**❌ Issues Identificados (4):**
+**🎯 IDENTITY INTEGRATION & TESTING STRATEGY (Active Development):**
 
-1. ❌ **TestDataSeeder usa entidades incorrectas** (tests usan `Cuenta`, dominio usa `Credencial` + `Perfile`)
-2. ❌ **Namespaces faltantes** (DTOs de Contratistas, Commands de Pagos)
-3. ❌ **Interfaces no encontradas** (ICardnetPaymentService, IPadronApiService)
-4. ❌ **Archivos duplicados** (AuthControllerTests)
+✅ **INFRASTRUCTURE COMPLETADO:**
 
-**📋 Acción Requerida:**
+1. **Real Database Connection** ✅
 
-1. Corregir TestDataSeeder para usar entidades reales del dominio
-2. Actualizar imports de DTOs y Commands
-3. Revisar interfaces de servicios externos
-4. Ejecutar tests y validar (target: 80% coverage)
+   - Integration tests connect to `db_a9f8ff_migente` (production database schema)
+   - TestWebApplicationFactory configured with real DbContext
+   - No mocks for database layer - catch real EF Core/SQL issues
 
-**Estado Testing:**
+2. **Legacy Tables Created** ✅
+   - Background work: Creating legacy tables needed for business logic
+   - AspNetUsers, AspNetRoles, AspNetUserRoles (Identity)
+   - Maintains compatibility with existing Credenciales/Perfiles tables
 
-- Unit Tests: ⚠️ 40% (parcial)
-- Integration Tests: ⚠️ 30% (configurado, necesita fixes)
-- E2E Tests: ❌ 0% (pendiente)
-- Coverage: ⚠️ ~45% (objetivo: 80%+)
+**🔄 IN PROGRESS:**
+
+3. **AuthController Flow Tests** - ACTIVE DEVELOPMENT
+
+   - Complete user registration flow with real data
+   - Login/Logout with JWT token validation
+   - Account activation flow
+   - Password reset/change flows
+   - Profile creation (Empleador/Contratista)
+
+4. **Identity Service Integration** - ONGOING
+   - Dual-write pattern: Identity tables (primary) + Legacy tables (compatibility)
+   - Auto-migration from Legacy users to Identity on first login
+   - Claims-based authorization with JWT tokens
+
+**⏳ NEXT PHASES:**
+
+5. **Empleadores Feature Tests** - TODO
+
+   - CRUD operations with authentication
+   - Business logic validation
+   - Database constraints testing
+
+6. **Contratistas Feature Tests** - TODO
+
+   - Similar to Empleadores pattern
+   - Services relationship testing
+
+7. **Complete Feature Coverage** - TODO
+   - Empleados, Nominas, Contrataciones, Suscripciones
+   - End-to-end user workflows
+   - Performance testing with real data
+
+**📊 Testing Status (Active Development - Oct 26, 2025):**
+
+- **Strategy:** Real database integration tests with complete user flows
+- **Current Module:** AuthController (all auth features: register, login, activate, reset password, profile creation)
+- **Database:** `db_a9f8ff_migente` (real connection, not in-memory)
+- **Focus:** Robust tests that identify application-level bugs, not test-level bugs
+- **Compilation:** In progress (refining command/query structures)
+
+**🎯 Current Testing Approach:**
+
+```csharp
+// Real Database + Real Services (no mocks unless necessary)
+public class AuthFlowTests : IClassFixture<TestWebApplicationFactory>
+{
+    private readonly HttpClient _client;
+    private readonly IApplicationDbContext _dbContext;
+
+    // Test complete user journeys:
+    // 1. Register → Activate → Login → Get Profile
+    // 2. Register → Login (inactive) → ResendActivation → Activate → Login
+    // 3. Register → ForgotPassword → ResetPassword → Login
+}
+```
+
+**✅ Benefits of Real Database Testing:**
+
+1. **Catches EF Core Issues:** Relationship mappings, cascade deletes, constraints
+2. **Identifies Command/Query Bugs:** Wrong property names, missing DTOs, incorrect business logic
+3. **Validates Identity Integration:** Real AspNetUsers tables, real claims, real tokens
+4. **Performance Testing:** Actual query performance, N+1 queries, indexing issues
+5. **Data Integrity:** Foreign keys, unique constraints, check constraints
+
+**🔧 Issues Being Resolved Through Testing:**
+
+- Command structure mismatches (primary constructors vs property initializers)
+- DTO property naming inconsistencies
+- Entity navigation properties issues
+- Value object creation patterns
+- Identity/Legacy dual-write synchronization
+
+**📋 Current Work Plan (Active Sprint):**
+
+**� PHASE 1: Auth Module Complete Coverage (Current - 2-3 days):**
+
+1. **Complete AuthController Flow Tests**
+
+   - ✅ Basic registration flow (Empleador/Contratista)
+   - 🔄 Account activation with email tokens
+   - 🔄 Login with JWT token validation
+   - 🔄 Password reset complete flow
+   - 🔄 Change password flow
+   - 🔄 Profile creation/update
+
+2. **Identity Integration Validation**
+
+   - Verify dual-write to Identity + Legacy tables
+   - Confirm claims are correctly populated
+   - Test auto-migration from Legacy users
+   - Validate JWT token generation/validation
+
+3. **Fix Application Bugs Discovered**
+   - Command/Query structure corrections
+   - DTO property mismatches
+   - Business logic validations
+   - Database constraint violations
+
+**🎯 PHASE 2: Empleadores Module (Next - 2-3 days):**
+
+4. **Empleadores CRUD Tests**
+
+   - Create with authentication
+   - Read by ID and by criteria
+   - Update profile data
+   - Soft delete validation
+
+5. **Business Logic Tests**
+   - Plan subscription enforcement
+   - Employee limits per plan
+   - Payment processing flows
+
+**🟢 PHASE 3: Complete Feature Coverage (1-2 weeks):**
+
+6. **Remaining Modules**
+
+   - Contratistas (similar to Empleadores)
+   - Empleados (payroll, TSS deductions)
+   - Nominas (salary processing)
+   - Contrataciones (temporary contracts)
+   - Suscripciones (subscription management)
+
+7. **End-to-End Workflows**
+   - Complete employer journey: Register → Subscribe → Add Employee → Process Payroll
+   - Complete contractor journey: Register → Add Services → Get Hired → Get Paid → Get Rated
+
+**Estado Testing (26 Octubre 2025):**
+
+- **Integration Tests:** 🔄 EN DESARROLLO ACTIVO (AuthController flow tests con DB real)
+- **Database:** ✅ Real connection to `db_a9f8ff_migente` configured
+- **Identity Integration:** 🔄 EN PROGRESO (dual-write pattern implementation)
+- **Current Focus:** AuthController complete flows (register → activate → login → profile)
+- **Testing Strategy:** Flow-based with real database (no mocks) to catch application bugs
+- **Unit Tests:** ⏳ PENDIENTE (after integration tests validate application layer)
+- **Coverage:** ⏳ TBD (focus on correctness before coverage metrics)
 
 ---
 
-### 🎯 PRÓXIMOS PASOS & PRIORIDADES
+### 🎯 CURRENT SPRINT PRIORITIES
 
-**🔴 CRÍTICO - Desbloquear Pagos (2-3 días):**
+**� ACTIVE NOW - AuthController Complete Testing (Current Week):**
 
-1. **GAP-022: EncryptionService Implementation**
+1. **Finish Auth Flow Tests** (In Progress)
 
-   - Port Legacy `Crypt.cs` class a Clean Architecture
-   - Interfaces: `IEncryptionService` con métodos Encrypt/Decrypt
-   - Implementación: AES-256 encryption compatible con Legacy
-   - Testing: Validar encrypt/decrypt con datos Legacy
-   - **Desbloquea:** GAP-016, GAP-019 (pagos con tarjetas)
+   - Complete registration flow tests (Empleador + Contratista)
+   - Account activation with real email tokens in database
+   - Login/Logout with JWT validation
+   - Password reset complete flow
+   - Profile creation and updates
+   - **Goal:** All Auth features tested with real database
 
-2. **GAP-016 & GAP-019: Cardnet Full Integration**
-   - Decrypt tarjetas antes de enviar a Cardnet
-   - Procesar pagos completos end-to-end
-   - Testing con tarjetas de prueba Cardnet
+2. **Identity Integration Refinement**
 
-**🟡 ALTA - Completar Testing (1-2 semanas):**
+   - Dual-write to Identity + Legacy tables working correctly
+   - Auto-migration from Legacy users on first login
+   - Claims population and JWT token generation validated
+   - Error handling and edge cases covered
 
-3. **Fix Integration Tests**
+3. **Fix Application Bugs as Discovered**
+   - Command/Query structure issues
+   - DTO mapping problems
+   - Business logic bugs
+   - Database relationship issues
+   - **Philosophy:** Test finds bug → Fix in application code, not test
 
-   - Corregir TestDataSeeder (entidades reales)
-   - Actualizar namespaces y DTOs
-   - Ejecutar y validar 58 tests
-   - Target: 80%+ code coverage
+**🎯 NEXT SPRINT - Empleadores Module (Next Week):**
 
-4. **Unit Tests Adicionales**
-   - Domain entities business logic
-   - Validators (FluentValidation)
-   - Services externos (mocks)
-   - Value Objects
+4. **Empleadores Feature Tests**
 
-**🟢 MEDIA - Frontend Migration (3-4 semanas):**
+   - CRUD operations with authentication
+   - Plan subscription validation
+   - Employee management flows
+   - Business rules testing
 
-5. **Blazor WebAssembly Setup**
+5. **Expand Test Coverage Incrementally**
+   - One feature at a time (Auth → Empleadores → Contratistas → Empleados...)
+   - Focus on complete flows, not isolated operations
+   - Real database ensures real-world scenarios
 
-   - Proyecto MiGenteEnLinea.Web (ya existe)
-   - Estructura de módulos (Auth, Empleadores, Contratistas, etc.)
-   - Shared components library
+**🟢 FUTURE WORK - Complete Coverage (2-3 weeks):**
 
-6. **Módulos Frontend Priority**
-   - Login/Register/Activate (CRÍTICO)
-   - Dashboard (Empleadores/Contratistas)
-   - Empleados CRUD
-   - Nómina processing
-   - Pagos y suscripciones
+6. **All Features Tested**
+
+   - Contratistas, Empleados, Nominas, Contrataciones, Suscripciones
+   - End-to-end user workflows
+   - Performance testing with realistic data volumes
+
+7. **GAP Closure (Parallel Work)**
+   - GAP-021: EmailService implementation (high priority)
+   - GAP-022: EncryptionService (blocks Cardnet integration)
+   - GAP-023 to GAP-028: Remaining functionality gaps
+
+**🎯 KEY TESTING PRINCIPLES FOR THIS PROJECT:**
+
+1. **Real Database First**
+
+   - Tests use actual SQL Server database (`db_a9f8ff_migente`)
+   - Catches real EF Core issues, relationship problems, constraint violations
+   - Validates actual query performance and data integrity
+
+2. **Flow-Based Testing**
+
+   - Test complete user journeys, not isolated units
+   - Example: Register → Activate → Login → Create Profile → Update Profile
+   - Mimics real user behavior and catches integration issues
+
+3. **Identity Integration Testing**
+
+   - Dual-write pattern: AspNetIdentity (primary) + Legacy tables (compatibility)
+   - Auto-migration from Legacy users
+   - Claims-based authorization validation
+
+4. **Error-Driven Development**
+
+   - Tests identify bugs in application layer
+   - Fix bugs in Commands/Queries/Handlers, not in tests
+   - Tests should remain simple and focused on real scenarios
+
+5. **Incremental Coverage**
+   - One feature at a time: Auth → Empleadores → Contratistas → etc.
+   - Complete each module before moving to next
+   - Build confidence progressively
+
+**🟢 FUTURE PHASES (After Testing Complete):**
+
+6. **Frontend Migration (Blazor)**
+
+   - MiGenteEnLinea.Web project (already exists)
+   - After backend is fully validated with tests
+   - Consume tested API endpoints
+
+7. **Production Deployment**
+   - CI/CD pipeline with automated tests
+   - Staged rollout with feature flags
+   - Monitoring and logging in production
 
 ## Project Structure
 

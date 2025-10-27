@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MiGenteEnLinea.Application.Common.Interfaces;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
@@ -35,6 +36,25 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         var scope = factory.Services.CreateScope();
         DbContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
         AppDbContext = DbContext; // MiGenteDbContext implementa IApplicationDbContext
+        
+        // Seedear datos de prueba automáticamente
+        SeedTestData().GetAwaiter().GetResult();
+    }
+    
+    /// <summary>
+    /// Seedea datos de prueba en la base de datos SQL Server
+    /// </summary>
+    private async Task SeedTestData()
+    {
+        // Verificar si ya hay datos (para evitar duplicados entre tests)
+        var hasData = await AppDbContext.Credenciales.AnyAsync();
+        if (hasData)
+        {
+            return; // Ya hay datos seeded
+        }
+        
+        // Ejecutar seeder
+        await TestDataSeeder.SeedAllAsync(AppDbContext);
     }
 
     /// <summary>
@@ -63,14 +83,15 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         var loginRequest = new
         {
             email,
-            password
+            password,
+            ipAddress = "127.0.0.1" // Required by LoginCommand
         };
 
         var response = await Client.PostAsJsonAsync("/api/auth/login", loginRequest);
         response.EnsureSuccessStatusCode();
 
         var loginResponse = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginResponse.GetProperty("accessToken").GetString();
+        var token = loginResponse.GetProperty("token").GetString(); // ✅ Fixed: property is "token" not "accessToken"
         
         token.Should().NotBeNullOrEmpty("El login debe devolver un access token");
         
@@ -89,14 +110,18 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         string tipo = "Empleador", // o "Contratista"
         string? identificacion = null)
     {
+        // ✅ FIX: RegisterCommand expects Tipo as int (1=Empleador, 2=Contratista) and Host property
+        int tipoInt = tipo.Equals("Contratista", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+        
         var registerRequest = new
         {
             email,
             password,
             nombre,
             apellido,
-            tipo,
-            identificacion = identificacion ?? GenerateRandomIdentification()
+            tipo = tipoInt, // ✅ Changed from string to int
+            host = "https://localhost:5015" // ✅ Added required Host property
+            // ✅ Removed identificacion - not used by RegisterCommand
         };
 
         var response = await Client.PostAsJsonAsync("/api/auth/register", registerRequest);
@@ -126,6 +151,15 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
     protected string GenerateUniqueEmail(string prefix = "test")
     {
         return $"{prefix}_{Guid.NewGuid():N}@test.com";
+    }
+    
+    /// <summary>
+    /// Limpia el ChangeTracker de EF Core para forzar queries frescas desde la base de datos.
+    /// Útil cuando el test necesita verificar cambios hechos por HTTP requests.
+    /// </summary>
+    protected void ClearChangeTracker()
+    {
+        DbContext.ChangeTracker.Clear();
     }
 
     /// <summary>

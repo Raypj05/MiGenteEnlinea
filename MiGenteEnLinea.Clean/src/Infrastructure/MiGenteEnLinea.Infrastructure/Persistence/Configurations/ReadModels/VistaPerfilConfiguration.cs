@@ -6,13 +6,40 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Configurations.ReadModels;
 
 /// <summary>
 /// Configuración de Entity Framework para VistaPerfil
-/// Mapea al read model con la vista legacy "VPerfiles"
+/// Usa ToSqlQuery() para Code-First puro (sin VIEW física en DB)
 /// </summary>
 public class VistaPerfilConfiguration : IEntityTypeConfiguration<VistaPerfil>
 {
     public void Configure(EntityTypeBuilder<VistaPerfil> builder)
     {
-        builder.ToView("VPerfiles");
+        // Code-First: Query inline en lugar de VIEW física
+        builder.ToSqlQuery(@"
+            SELECT 
+                p.perfilID,
+                p.fechaCreacion,
+                p.userID,
+                p.Tipo,
+                p.Nombre,
+                p.Apellido,
+                p.Email,
+                p.telefono1,
+                p.telefono2,
+                p.usuario,
+                pi.id,
+                pi.tipoIdentificacion,
+                pi.identificacion,
+                pi.direccion,
+                pi.fotoPerfil,
+                pi.presentacion,
+                pi.nombreComercial,
+                pi.cedulaGerente,
+                pi.nombreGerente,
+                pi.apellidoGerente,
+                pi.direccionGerente
+            FROM Perfiles p
+            LEFT JOIN perfilesInfo pi ON p.perfilID = pi.perfilID
+        ");
+        
         builder.HasNoKey();
 
         builder.Property(v => v.PerfilId).HasColumnName("perfilID");

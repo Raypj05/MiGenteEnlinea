@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
@@ -11,13 +12,14 @@ using MiGenteEnLinea.Infrastructure.Persistence.Interceptors;
 namespace MiGenteEnLinea.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Factory para crear un servidor de prueba con base de datos InMemory y servicios mock.
-/// Reemplaza SQL Server con InMemory database y servicios externos con mocks para tests aislados.
-/// CONFIGURACIÓN CRÍTICA: 
+/// Factory para crear un servidor de prueba con SQL Server real y servicios mock.
+/// CONFIGURACIÓN CRÍTICA:
+/// - Usa SQL Server Docker (localhost,1433) con base de datos MiGenteTestDB
 /// - AuditableEntityInterceptor para CreatedAt/UpdatedAt automáticos
 /// - Mock de IEmailService para no enviar emails reales
 /// - Mock de IPaymentService para simular pagos Cardnet
 /// - Mock de IPadronService para simular consultas al padrón
+/// - Base de datos persistente entre tests para validar relaciones FK reales
 /// </summary>
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -27,10 +29,19 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureServices(services =>
+        // Configurar environment como Testing
+        builder.UseEnvironment("Testing");
+
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            // Cargar appsettings.Testing.json
+            config.AddJsonFile("appsettings.Testing.json", optional: false, reloadOnChange: false);
+        });
+
+        builder.ConfigureServices((context, services) =>
         {
             // ========================================
-            // PASO 1: Remover DbContext de producción (SQL Server)
+            // PASO 1: Remover DbContext de producción
             // ========================================
             var dbContextDescriptor = services.SingleOrDefault(
                 d => d.ServiceType == typeof(DbContextOptions<MiGenteDbContext>));
@@ -65,11 +76,19 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<IEmailService>();
             EmailServiceMock = new Mock<IEmailService>();
             EmailServiceMock
-                .Setup(x => x.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
-                .ReturnsAsync(true);
+                .Setup(x => x.SendEmailAsync(
+                    It.IsAny<string>(), 
+                    It.IsAny<string>(), 
+                    It.IsAny<string>(), 
+                    It.IsAny<string>(), 
+                    It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
             EmailServiceMock
-                .Setup(x => x.SendActivationEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(true);
+                .Setup(x => x.SendActivationEmailAsync(
+                    It.IsAny<string>(), 
+                    It.IsAny<string>(), 
+                    It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
             services.AddScoped(_ => EmailServiceMock.Object);
 
             // Mock Payment Service (Cardnet)
@@ -120,14 +139,21 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             }
 
             // ========================================
-            // PASO 5: Agregar DbContext InMemory con AuditableEntityInterceptor
+            // PASO 5: Agregar DbContext con SQL Server real + AuditableEntityInterceptor
             // ⚠️ CRÍTICO: Debe incluir .AddInterceptors() igual que producción
             // ========================================
+            var connectionString = context.Configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found in appsettings.Testing.json");
+
             services.AddDbContext<MiGenteDbContext>((serviceProvider, options) =>
             {
-                // Usar nombre único por test para evitar conflictos
-                var databaseName = "TestDatabase_" + Guid.NewGuid().ToString();
-                options.UseInMemoryDatabase(databaseName);
+                options.UseSqlServer(connectionString, sqlOptions =>
+                {
+                    sqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorNumbersToAdd: null);
+                });
                 options.EnableSensitiveDataLogging();
                 options.EnableDetailedErrors();
                 
@@ -137,15 +163,15 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             });
 
             // ========================================
-            // PASO 6: Asegurar que la base de datos está creada y limpia
+            // PASO 6: Asegurar que la base de datos está creada con migraciones
             // ========================================
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
             var scopedServices = scope.ServiceProvider;
             var db = scopedServices.GetRequiredService<MiGenteDbContext>();
             
-            // Asegurar que la DB está creada
-            db.Database.EnsureCreated();
+            // Aplicar migraciones pendientes
+            db.Database.Migrate();
         });
     }
 

@@ -11,22 +11,28 @@ namespace MiGenteEnLinea.Application.Features.Authentication.Commands.Register;
 
 /// <summary>
 /// Handler para RegisterCommand
-/// Réplica EXACTA de SuscripcionesService.GuardarPerfil() del Legacy
-/// LOTE 6: Refactorizado completamente para usar IUnitOfWork
+/// ESTRATEGIA DE MIGRACIÓN (Opción A - Identity Primario):
+/// 1. Crear usuario en ASP.NET Core Identity (tabla AspNetUsers) - PRIMARIO
+/// 2. Sincronizar con tablas Legacy (Perfiles, Credenciales) - SECUNDARIO para lógica de negocio
+/// 3. Crear Contratista automáticamente (GAP-010) - para compatibilidad
+/// 4. Enviar email de activación
 /// </summary>
 public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, RegisterResult>
 {
-    private readonly IUnitOfWork _unitOfWork; // LOTE 6: Todas las entidades via repository pattern
-    private readonly IPasswordHasher _passwordHasher;
+    private readonly IIdentityService _identityService; // ✅ Sistema Identity (primario)
+    private readonly IUnitOfWork _unitOfWork; // ✅ Tablas Legacy (sincronización)
+    private readonly IPasswordHasher _passwordHasher; // ✅ Para sincronizar password con Credenciales Legacy
     private readonly IEmailService _emailService;
     private readonly ILogger<RegisterCommandHandler> _logger;
 
     public RegisterCommandHandler(
+        IIdentityService identityService,
         IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         IEmailService emailService,
         ILogger<RegisterCommandHandler> logger)
     {
+        _identityService = identityService;
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _emailService = emailService;
@@ -36,10 +42,9 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
     public async Task<RegisterResult> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
         // ================================================================================
-        // PASO 1: VALIDAR QUE EL EMAIL NO EXISTA
+        // PASO 1: VERIFICAR QUE EL EMAIL NO EXISTA (en Identity)
         // ================================================================================
-        // Legacy usa Cuentas.Email, Clean usa Credenciales.Email (mismo objetivo)
-        var emailExists = await _unitOfWork.Credenciales.ExistsByEmailAsync(request.Email, cancellationToken);
+        var emailExists = await _identityService.UserExistsAsync(request.Email);
 
         if (emailExists)
         {
@@ -53,118 +58,126 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
         }
 
         // ================================================================================
-        // PASO 2: CREAR PERFIL (equivalente a Cuenta en Legacy)
+        // PASO 2: REGISTRAR USUARIO EN IDENTITY (PRIMARIO) ✅
         // ================================================================================
-        // Legacy: db.Cuentas.Add(p);
-        // Clean: Usamos Perfile (mapea a tabla Perfiles en DB)
-        var userId = Guid.NewGuid().ToString();
-        
-        Perfile perfil;
-        if (request.Tipo == 1)
-        {
-            perfil = Perfile.CrearPerfilEmpleador(
-                userId: userId,
-                nombre: request.Nombre,
-                apellido: request.Apellido,
-                email: request.Email,
-                telefono1: request.Telefono1,
-                telefono2: request.Telefono2
-            );
-        }
-        else // Tipo == 2
-        {
-            perfil = Perfile.CrearPerfilContratista(
-                userId: userId,
-                nombre: request.Nombre,
-                apellido: request.Apellido,
-                email: request.Email,
-                telefono1: request.Telefono1,
-                telefono2: request.Telefono2
-            );
-        }
-        
-        await _unitOfWork.Perfiles.AddAsync(perfil, cancellationToken);
+        // Identity crea el usuario en AspNetUsers con password hasheado automáticamente
+        var nombreCompleto = $"{request.Nombre} {request.Apellido}";
+        var tipo = request.Tipo == 1 ? "Empleador" : "Contratista";
 
-        // ================================================================================
-        // PASO 3: CREAR CREDENCIAL CON PASSWORD HASHEADO
-        // ================================================================================
-        // Legacy: guardarCredenciales() crea registro en Credenciales con password encriptado
-        // Clean: Usamos BCrypt en lugar de Crypt.Encrypt()
-        // Nota: Credencial.Create() ya pone activo=false por defecto
-        var email = Domain.ValueObjects.Email.Create(request.Email);
-        var credencial = Credencial.Create(
-            userId: userId,
-            email: email!,
-            passwordHash: _passwordHasher.HashPassword(request.Password)
-        );
-
-        await _unitOfWork.Credenciales.AddAsync(credencial, cancellationToken);
-
-        // ================================================================================
-        // PASO 4: CREAR CONTRATISTA AUTOMÁTICAMENTE (GAP-010)
-        // ================================================================================
-        // ⚠️ LEGACY BUG: GuardarPerfil() SIEMPRE crea Contratista, independiente del tipo
-        // Legacy líneas 20-35: Crea Contratistas sin validar tipo de usuario
-        // 
-        // ✅ FIX GAP-010: Replicar comportamiento Legacy - SIEMPRE crear Contratista
-        // 
-        // Razón: En el sistema Legacy, todo usuario registrado es potencial proveedor de servicios.
-        // - Si es Empleador (tipo=1): Puede contratar, pero también ofrecer servicios
-        // - Si es Contratista (tipo=2): Puede ofrecer servicios y también contratar
-        // 
-        // Campos Legacy copiados:
-        // - userID: ID del usuario (PK)
-        // - Nombre, Apellido, email, telefono1, telefono2: Datos personales
-        // - tipo: SIEMPRE 1 (Persona Física) - valor hardcoded en Legacy línea 30
-        // - activo: SIEMPRE false - requiere aprobación/activación manual
-        // - fechaIngreso: Fecha de creación del perfil
-        var contratista = Contratista.Create(
-            userId: userId,
-            nombre: request.Nombre,
-            apellido: request.Apellido,
-            tipo: 1,  // ⚠️ HARDCODED: tipo=1 (Persona Física) - igual que Legacy línea 30
-            telefono1: request.Telefono1
-        );
-
-        await _unitOfWork.Contratistas.AddAsync(contratista, cancellationToken);
-
-        // ================================================================================
-        // PASO 5: CREAR SUSCRIPCIÓN INICIAL CON PLANID=0
-        // ================================================================================
-        // Legacy: No crea suscripción en GuardarPerfil, pero en flujo de registro siempre
-        //         debe haber una suscripción inicial sin plan (planID=0)
-        // TODO: Descomentar cuando se implemente un factory method para suscripción sin plan
-        // Por ahora, la suscripción se creará cuando el usuario compre su primer plan
-        /*
-        var suscripcion = Suscripcion.Create(
-            userId: userId,
-            planId: 0, // ⚠️ PROBLEMA: Create() valida planId > 0
-            duracionMeses: 1
-        );
-
-        await _unitOfWork.Suscripciones.AddAsync(suscripcion, cancellationToken);
-        */
-
-        // ================================================================================
-        // PASO 6: GUARDAR CAMBIOS EN LA BASE DE DATOS (UN SOLO SaveChanges)
-        // ================================================================================
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation(
-            "Usuario registrado exitosamente. UserId: {UserId}, Email: {Email}, Tipo: {Tipo}",
-            userId, request.Email, request.Tipo);
-
-        // ================================================================================
-        // PASO 7: ENVIAR EMAIL DE ACTIVACIÓN
-        // ================================================================================
-        // Legacy: enviarCorreoActivacion(host, email, p)
-        //         Genera URL: host + "/Activar.aspx?userID=" + userID + "&email=" + email
+        string userId;
         try
         {
-            // Nueva firma: SendActivationEmailAsync(toEmail, toName, activationUrl)
-            var nombreCompleto = $"{request.Nombre} {request.Apellido}";
+            userId = await _identityService.RegisterAsync(
+                email: request.Email,
+                password: request.Password,
+                nombreCompleto: nombreCompleto,
+                tipo: tipo
+            );
+
+            _logger.LogInformation(
+                "Usuario registrado en Identity. UserId: {UserId}, Email: {Email}, Tipo: {Tipo}",
+                userId, request.Email, tipo);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al registrar usuario en Identity: {Email}", request.Email);
+            return new RegisterResult
+            {
+                Success = false,
+                UserId = null,
+                Message = "Error al registrar usuario. Por favor, intenta nuevamente."
+            };
+        }
+
+        // ================================================================================
+        // PASO 3: SINCRONIZAR CON TABLAS LEGACY (para lógica de negocio existente) ✅
+        // ================================================================================
+        // Nota: Esto es temporal durante la migración. Eventualmente toda la lógica de negocio
+        //       usará Identity y estas tablas se deprecarán.
+
+        try
+        {
+            // 3.1 Crear Perfil (tabla Perfiles - usada en lógica de negocio)
+            Perfile perfil;
+            if (request.Tipo == 1)
+            {
+                perfil = Perfile.CrearPerfilEmpleador(
+                    userId: userId,
+                    nombre: request.Nombre,
+                    apellido: request.Apellido,
+                    email: request.Email,
+                    telefono1: request.Telefono1,
+                    telefono2: request.Telefono2
+                );
+            }
+            else
+            {
+                perfil = Perfile.CrearPerfilContratista(
+                    userId: userId,
+                    nombre: request.Nombre,
+                    apellido: request.Apellido,
+                    email: request.Email,
+                    telefono1: request.Telefono1,
+                    telefono2: request.Telefono2
+                );
+            }
+
+            await _unitOfWork.Perfiles.AddAsync(perfil, cancellationToken);
+
+            // 3.2 Crear Credencial (tabla Credenciales - usada en lógica de negocio)
+            var email = Domain.ValueObjects.Email.Create(request.Email);
+            var credencial = Credencial.Create(
+                userId: userId,
+                email: email!,
+                passwordHash: _passwordHasher.HashPassword(request.Password)
+            );
+
+            await _unitOfWork.Credenciales.AddAsync(credencial, cancellationToken);
+
+            // 3.3 Crear Contratista (GAP-010 - Legacy siempre crea Contratista para todos)
+            // Razón: En el sistema Legacy, todo usuario puede ofrecer servicios
+            var contratista = Contratista.Create(
+                userId: userId,
+                nombre: request.Nombre,
+                apellido: request.Apellido,
+                tipo: 1, // Persona Física (hardcoded como en Legacy)
+                telefono1: request.Telefono1
+            );
+
+            await _unitOfWork.Contratistas.AddAsync(contratista, cancellationToken);
+
+            // 3.4 Guardar cambios Legacy
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Tablas Legacy sincronizadas para usuario: {UserId}",
+                userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al sincronizar tablas Legacy para usuario {UserId}. Usuario existe en Identity pero no en Legacy.",
+                userId);
+
+            // Usuario ya está en Identity, pero sincronización Legacy falló
+            // Retornar éxito parcial - el usuario puede loguearse pero puede tener problemas con funcionalidades Legacy
+            return new RegisterResult
+            {
+                Success = true,
+                UserId = userId,
+                Email = request.Email,
+                Message = "Registro exitoso. Revisa tu correo para activar tu cuenta. (Nota: Algunas funcionalidades pueden requerir configuración adicional)"
+            };
+        }
+
+        // ================================================================================
+        // PASO 4: ENVIAR EMAIL DE ACTIVACIÓN ✅
+        // ================================================================================
+        try
+        {
             var activationUrl = $"{request.Host}/Activar.aspx?userID={userId}&email={request.Email}";
-            
+
             await _emailService.SendActivationEmailAsync(
                 toEmail: request.Email,
                 toName: nombreCompleto,
@@ -181,7 +194,7 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
         }
 
         // ================================================================================
-        // RETORNAR RESULTADO EXITOSO
+        // PASO 5: RETORNAR RESULTADO EXITOSO ✅
         // ================================================================================
         return new RegisterResult
         {

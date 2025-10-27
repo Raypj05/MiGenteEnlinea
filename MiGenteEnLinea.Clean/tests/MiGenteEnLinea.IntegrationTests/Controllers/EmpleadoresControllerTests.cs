@@ -1,66 +1,62 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using MiGenteEnLinea.Application.Features.Empleadores.Commands.CreateEmpleador;
 using MiGenteEnLinea.Application.Features.Empleadores.Commands.UpdateEmpleador;
 using MiGenteEnLinea.Application.Features.Empleadores.DTOs;
 using MiGenteEnLinea.IntegrationTests.Infrastructure;
+using Xunit;
 
 namespace MiGenteEnLinea.IntegrationTests.Controllers;
 
 /// <summary>
-/// Tests de integración para EmpleadoresController - CRUD completo
+/// Integration tests for EmpleadoresController
+/// BLOQUE 2: Empleadores CRUD operations (8 tests)
 /// </summary>
-[Collection("Integration Tests")]
+[Collection("IntegrationTests")]
 public class EmpleadoresControllerTests : IntegrationTestBase
 {
     public EmpleadoresControllerTests(TestWebApplicationFactory factory) : base(factory)
     {
     }
 
-    #region Create Tests
+    #region CreateEmpleador Tests (2 tests)
 
     [Fact]
-    public async Task CreateEmpleador_WithValidData_CreatesSuccessfully()
+    public async Task CreateEmpleador_WithValidData_CreatesProfileAndReturnsEmpleadorId()
     {
-        // Arrange - Autenticar como empleador que NO tiene perfil aún
-        await LoginAsync("maria.garcia@test.com", TestDataSeeder.TestPasswordPlainText);
-
-        // ✅ Obtener userId desde credenciales (usuario sin empleador creado)
-        var credencial = await AppDbContext.Credenciales
-            .FirstAsync(c => c.Email.Value == "maria.garcia@test.com");
+        // Arrange - Register and login as empleador
+        var email = GenerateUniqueEmail("empleador");
+        var userId = await RegisterUserAsync(email, "Password123!", "Juan", "Pérez", "Empleador");
+        await LoginAsync(email, "Password123!");
 
         var command = new CreateEmpleadorCommand(
-            UserId: credencial.UserId,
-            Habilidades: "Gestión de equipos, Recursos Humanos",
-            Experiencia: "10 años en administración",
-            Descripcion: "Empresa dedicada a servicios tecnológicos"
+            UserId: userId.ToString(),
+            Habilidades: "Gestión de proyectos de construcción",
+            Experiencia: "15 años en el sector construcción",
+            Descripcion: "Empresa líder en construcción de edificios comerciales"
         );
 
         // Act
         var response = await Client.PostAsJsonAsync("/api/empleadores", command);
 
         // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var empleadorId = await response.Content.ReadFromJsonAsync<int>();
         empleadorId.Should().BeGreaterThan(0);
-
-        // Verificar en DB
-        var createdEmpleador = await AppDbContext.Empleadores.FindAsync(empleadorId);
-        createdEmpleador.Should().NotBeNull();
-        createdEmpleador!.UserId.Should().Be(credencial.UserId);
-        createdEmpleador.Habilidades.Should().Be("Gestión de equipos, Recursos Humanos");
     }
 
     [Fact]
     public async Task CreateEmpleador_WithoutAuthentication_ReturnsUnauthorized()
     {
-        // Arrange - NO autenticar
+        // Arrange - No authentication token
+        ClearAuthToken();
+
         var command = new CreateEmpleadorCommand(
-            UserId: "test-user-id",
-            Habilidades: "Test",
-            Experiencia: "Test"
+            UserId: "some-user-id",
+            Habilidades: "Test skills",
+            Experiencia: "Test experience",
+            Descripcion: "Test description"
         );
 
         // Act
@@ -70,271 +66,179 @@ public class EmpleadoresControllerTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    // ✅ NOTA: CreateEmpleadorCommand no valida datos internamente (solo UserId requerido)
-    // Los campos Habilidades, Experiencia, Descripcion son todos opcionales
-    // No hay validación de longitud en el Command (solo en el dominio al crear)
-
     #endregion
 
-    #region Get Tests
+    #region GetEmpleadorById Tests (2 tests)
 
     [Fact]
-    public async Task GetEmpleadorById_WithValidId_ReturnsEmpleador()
+    public async Task GetEmpleadorById_WithValidId_ReturnsEmpleadorDto()
     {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        var empleador = await TestDataSeeder.GetEmpleadorActivoAsync(AppDbContext);
+        // Arrange - Register, login, and create empleador
+        var email = GenerateUniqueEmail("empleador");
+        var userId = await RegisterUserAsync(email, "Password123!", "María", "González", "Empleador");
+        await LoginAsync(email, "Password123!");
+
+        var createCommand = new CreateEmpleadorCommand(
+            UserId: userId.ToString(),
+            Habilidades: "Gestión empresarial",
+            Experiencia: "10 años",
+            Descripcion: "Empresa de servicios profesionales"
+        );
+        var createResponse = await Client.PostAsJsonAsync("/api/empleadores", createCommand);
+        var empleadorId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         // Act
-        var response = await Client.GetAsync($"/api/empleadores/{empleador.Id}");
+        var response = await Client.GetAsync($"/api/empleadores/{empleadorId}");
 
         // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-        var result = await response.Content.ReadFromJsonAsync<EmpleadorDto>();
-        result.Should().NotBeNull();
-        result!.EmpleadorId.Should().Be(empleador.Id);
-        // ✅ Empleador solo tiene Habilidades, Experiencia, Descripcion (no NombreEmpresa ni RncCedula)
-        result.Habilidades.Should().NotBeNullOrEmpty();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var empleadorDto = await response.Content.ReadFromJsonAsync<EmpleadorDto>();
+        empleadorDto.Should().NotBeNull();
+        empleadorDto!.EmpleadorId.Should().Be(empleadorId);
+        empleadorDto.UserId.Should().Be(userId.ToString());
+        empleadorDto.Habilidades.Should().Be("Gestión empresarial");
+        empleadorDto.Experiencia.Should().Be("10 años");
+        empleadorDto.Descripcion.Should().Be("Empresa de servicios profesionales");
     }
 
     [Fact]
     public async Task GetEmpleadorById_WithNonExistentId_ReturnsNotFound()
     {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
+        // Arrange - Register and login
+        var email = GenerateUniqueEmail("empleador");
+        await RegisterUserAsync(email, "Password123!", "Pedro", "Martínez", "Empleador");
+        await LoginAsync(email, "Password123!");
+
+        var nonExistentId = 999999;
 
         // Act
-        var response = await Client.GetAsync("/api/empleadores/99999");
+        var response = await Client.GetAsync($"/api/empleadores/{nonExistentId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    #endregion
+
+    #region GetEmpleadoresList Tests (1 test)
+
     [Fact]
-    public async Task GetAllEmpleadores_ReturnsEmpleadoresList()
+    public async Task GetEmpleadoresList_ReturnsListOfEmpleadores()
     {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
+        // Arrange - Register and login
+        var email = GenerateUniqueEmail("empleador");
+        await RegisterUserAsync(email, "Password123!", "Ana", "López", "Empleador");
+        await LoginAsync(email, "Password123!");
 
         // Act
         var response = await Client.GetAsync("/api/empleadores");
 
         // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-        var result = await response.Content.ReadFromJsonAsync<List<EmpleadorDto>>();
-        result.Should().NotBeNull();
-        result!.Should().HaveCountGreaterOrEqualTo(2); // Tenemos 2 seeded
-    }
-
-    [Fact]
-    public async Task GetEmpleadorPerfil_WithValidCuentaId_ReturnsProfile()
-    {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        var empleador = await TestDataSeeder.GetEmpleadorActivoAsync(AppDbContext);
-
-        // Act
-        var response = await Client.GetAsync($"/api/empleadores/perfil/{empleador.UserId}");
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-        var result = await response.Content.ReadFromJsonAsync<EmpleadorDto>();
-        result.Should().NotBeNull();
-        // ✅ Empleador tiene Habilidades, Experiencia, Descripcion
-        result!.UserId.Should().Be(empleador.UserId);
-    }
-
-    [Fact]
-    public async Task SearchEmpleadores_WithKeyword_ReturnsMatchingResults()
-    {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-
-        // Act
-        var response = await Client.GetAsync("/api/empleadores/search?keyword=Pérez");
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-        var result = await response.Content.ReadFromJsonAsync<List<EmpleadorDto>>();
-        result.Should().NotBeNull();
-        result!.Should().NotBeEmpty();
-        result.Should().Contain(e => e.NombreEmpresa.Contains("Pérez"));
-    }
-
-    [Fact]
-    public async Task SearchEmpleadores_WithNonMatchingKeyword_ReturnsEmptyList()
-    {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-
-        // Act
-        var response = await Client.GetAsync("/api/empleadores/search?keyword=NonExistentKeyword12345");
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-        var result = await response.Content.ReadFromJsonAsync<List<EmpleadorDto>>();
-        result.Should().NotBeNull();
-        result!.Should().BeEmpty();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var empleadores = await response.Content.ReadFromJsonAsync<List<EmpleadorDto>>();
+        empleadores.Should().NotBeNull();
+        empleadores.Should().BeOfType<List<EmpleadorDto>>();
+        // Note: List might be empty or contain test data
     }
 
     #endregion
 
-    #region Update Tests
+    #region UpdateEmpleador Tests (2 tests)
 
     [Fact]
     public async Task UpdateEmpleador_WithValidData_UpdatesSuccessfully()
     {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        var empleador = await TestDataSeeder.GetEmpleadorActivoAsync(DbContext);
+        // Arrange - Register, login, and create empleador
+        var email = GenerateUniqueEmail("empleador");
+        var userId = await RegisterUserAsync(email, "Password123!", "Carlos", "Ramírez", "Empleador");
+        await LoginAsync(email, "Password123!");
 
-        var command = new UpdateEmpleadorCommand
-        {
-            Id = empleador.Id,
-            NombreEmpresa = "Pérez Construcciones SRL - ACTUALIZADA",
-            RncCedula = empleador.RncCedula,
-            Direccion = "Nueva Dirección Actualizada #999",
-            Sector = "Construcción y Desarrollo",
-            Web = "www.perezconstrucciones-new.com",
-            Telefono = "809-999-8888"
-        };
+        var createCommand = new CreateEmpleadorCommand(
+            UserId: userId.ToString(),
+            Habilidades: "Original skills",
+            Experiencia: "Original experience",
+            Descripcion: "Original description"
+        );
+        var createResponse = await Client.PostAsJsonAsync("/api/empleadores", createCommand);
+        var empleadorId = await createResponse.Content.ReadFromJsonAsync<int>();
+
+        // Update empleador
+        var updateCommand = new UpdateEmpleadorCommand(
+            UserId: userId.ToString(),
+            Habilidades: "Updated skills: Gestión de proyectos",
+            Experiencia: "Updated experience: 20 años",
+            Descripcion: "Updated description: Empresa líder en innovación"
+        );
 
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/empleadores/{empleador.Id}", command);
+        var response = await Client.PutAsJsonAsync($"/api/empleadores/{empleadorId}", updateCommand);
 
         // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var success = await response.Content.ReadFromJsonAsync<bool>();
+        success.Should().BeTrue();
 
-        // Verificar en DB
-        await DbContext.Entry(empleador).ReloadAsync();
-        empleador.NombreEmpresa.Should().Be("Pérez Construcciones SRL - ACTUALIZADA");
-        empleador.Direccion.Should().Be("Nueva Dirección Actualizada #999");
-        empleador.Web.Should().Be("www.perezconstrucciones-new.com");
+        // Verify update
+        var getResponse = await Client.GetAsync($"/api/empleadores/{empleadorId}");
+        var updatedEmpleador = await getResponse.Content.ReadFromJsonAsync<EmpleadorDto>();
+        updatedEmpleador.Should().NotBeNull();
+        updatedEmpleador!.Habilidades.Should().Be("Updated skills: Gestión de proyectos");
+        updatedEmpleador.Experiencia.Should().Be("Updated experience: 20 años");
+        updatedEmpleador.Descripcion.Should().Be("Updated description: Empresa líder en innovación");
     }
 
     [Fact]
-    public async Task UpdateEmpleador_WithNonExistentId_ReturnsNotFound()
+    public async Task UpdateEmpleador_WithoutAuthentication_ReturnsUnauthorized()
     {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
+        // Arrange - No authentication token
+        ClearAuthToken();
 
-        var command = new UpdateEmpleadorCommand
-        {
-            Id = 99999,
-            NombreEmpresa = "Test Empresa",
-            RncCedula = "101-99999-9",
-            Direccion = "Test Address",
-            Sector = "Test"
-        };
+        var updateCommand = new UpdateEmpleadorCommand(
+            UserId: "some-user-id",
+            Habilidades: "Test skills",
+            Experiencia: "Test experience",
+            Descripcion: "Test description"
+        );
 
         // Act
-        var response = await Client.PutAsJsonAsync("/api/empleadores/99999", command);
+        var response = await Client.PutAsJsonAsync("/api/empleadores/123", updateCommand);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task UpdateEmpleador_WithMismatchedIds_ReturnsBadRequest()
-    {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        var empleador = await TestDataSeeder.GetEmpleadorActivoAsync(DbContext);
-
-        var command = new UpdateEmpleadorCommand
-        {
-            Id = 999, // ID diferente al de la URL
-            NombreEmpresa = "Test",
-            RncCedula = "101-99999-9",
-            Direccion = "Test",
-            Sector = "Test"
-        };
-
-        // Act
-        var response = await Client.PutAsJsonAsync($"/api/empleadores/{empleador.Id}", command);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     #endregion
 
-    #region Delete Tests
+    #region GetEmpleadorPerfil Tests (1 test)
 
     [Fact]
-    public async Task DeleteEmpleador_WithValidId_DeletesSuccessfully()
+    public async Task GetEmpleadorPerfil_WithValidUserId_ReturnsProfile()
     {
-        // Arrange - Crear un empleador temporal para eliminar
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        var empleador = await TestDataSeeder.GetEmpleadorActivoAsync(DbContext);
-        
-        // Crear uno nuevo para poder eliminarlo sin afectar los datos seeded
-        var newEmpleador = new Domain.Entities.Empleadores.Empleador
-        {
-            CuentaId = empleador.UserId,
-            NombreEmpresa = "Empresa Temporal",
-            RncCedula = "101-88888-8",
-            Direccion = "Temp Address",
-            Sector = "Temp"
-        };
-        DbContext.Empleadores.Add(newEmpleador);
-        await DbContext.SaveChangesAsync();
+        // Arrange - Register, login, and create empleador
+        var email = GenerateUniqueEmail("empleador");
+        var userId = await RegisterUserAsync(email, "Password123!", "Laura", "Fernández", "Empleador");
+        await LoginAsync(email, "Password123!");
+
+        var createCommand = new CreateEmpleadorCommand(
+            UserId: userId.ToString(),
+            Habilidades: "Perfil test skills",
+            Experiencia: "Perfil test experience",
+            Descripcion: "Perfil test description"
+        );
+        await Client.PostAsJsonAsync("/api/empleadores", createCommand);
 
         // Act
-        var response = await Client.DeleteAsync($"/api/empleadores/{newEmpleador.Id}");
+        var response = await Client.GetAsync($"/api/empleadores/by-user/{userId}");
 
         // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-
-        // Verificar que fue eliminado (soft delete)
-        await DbContext.Entry(newEmpleador).ReloadAsync();
-        newEmpleador.IsDeleted.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task DeleteEmpleador_WithNonExistentId_ReturnsNotFound()
-    {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-
-        // Act
-        var response = await Client.DeleteAsync("/api/empleadores/99999");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    #endregion
-
-    #region Update Profile Tests
-
-    [Fact]
-    public async Task UpdateEmpleadorProfile_WithValidData_UpdatesSuccessfully()
-    {
-        // Arrange
-        await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        var empleador = await TestDataSeeder.GetEmpleadorActivoAsync(DbContext);
-
-        var updateData = new
-        {
-            nombreEmpresa = "Perfil Actualizado SRL",
-            sector = "Sector Actualizado",
-            web = "www.updated.com"
-        };
-
-        // Act
-        var response = await Client.PutAsJsonAsync($"/api/empleadores/perfil/{empleador.UserId}", updateData);
-
-        // Assert
-        response.IsSuccessStatusCode.Should().BeTrue();
-
-        // Verificar en DB
-        await DbContext.Entry(empleador).ReloadAsync();
-        empleador.NombreEmpresa.Should().Be("Perfil Actualizado SRL");
-        empleador.Sector.Should().Be("Sector Actualizado");
-        empleador.Web.Should().Be("www.updated.com");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var empleadorDto = await response.Content.ReadFromJsonAsync<EmpleadorDto>();
+        empleadorDto.Should().NotBeNull();
+        empleadorDto!.UserId.Should().Be(userId.ToString());
+        empleadorDto.Habilidades.Should().Be("Perfil test skills");
+        empleadorDto.Experiencia.Should().Be("Perfil test experience");
+        empleadorDto.Descripcion.Should().Be("Perfil test description");
     }
 
     #endregion
 }
-

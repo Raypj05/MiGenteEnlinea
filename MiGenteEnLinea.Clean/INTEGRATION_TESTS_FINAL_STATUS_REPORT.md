@@ -418,5 +418,161 @@ cd "c:\Users\ray\OneDrive\Documents\ProyectoMigente\MiGenteEnLinea.Clean\tests\M
 
 ---
 
-**Última Actualización:** 12 de Octubre 2025, 23:45  
-**Próxima Acción:** Opción B (Lanzar agente autónomo) o continuar manualmente según disponibilidad
+**Última Actualización:** 26 de Octubre 2025, Sesión Manual (Reescritura Iniciada)  
+**Estado:** 🔄 EN PROGRESO - Reescribiendo tests desde cero  
+**Progreso:** AuthController parcialmente reescrito, estrategia ajustada
+
+---
+
+## 🚨 ACTUALIZACIÓN CRÍTICA - Sesión Manual
+
+### Estado Real Actual
+
+- **Errores Actuales:** 218 errores (no 109 como reportado anteriormente)
+- **Causa Raíz:** Tests fueron escritos asumiendo estructuras incorrectas de Commands/Entities
+- **Intentos de Corrección:**
+  - ✅ UpdateContratistaCommand structure identificada (primary constructor)
+  - ✅ ChangePasswordCommand structure identificada (Email, UserId, NewPassword)
+  - ❌ Reemplazos masivos causaron más errores (1088)
+  - ❌ Git checkout revirtió correcciones individuales
+
+### Problemas Fundamentales Identificados
+
+1. **ProcessPaymentCommand NO EXISTE** → El command real es `ProcesarVentaCommand`
+2. **TestWebApplicationFactory NO tiene CardnetServiceMock** → Tests no pueden compilar
+3. **Commands usan primary constructors** → Tests usan property initializers
+4. **Contratista entity propiedades incorrectas** → Tests asumen FechaNacimiento, Sexo, Direccion (no existen)
+5. **ChangePasswordCommand NO valida password actual** → Tests asumen CurrentPassword property
+
+### Estrategia Recomendada
+
+#### OPCIÓN 1: Eliminar Tests Temporalmente (RÁPIDO - 15 min)
+
+```powershell
+# Comentar todos los tests y dejar solo la infraestructura
+cd "c:\Users\ray\OneDrive\Documents\ProyectoMigente\MiGenteEnLinea.Clean\tests\MiGenteEnLinea.IntegrationTests\Controllers"
+
+# Crear backup
+Copy-Item *.cs -Destination Backup\
+
+# Eliminar archivos de tests problemáticos
+Remove-Item AuthControllerIntegrationTests.cs
+Remove-Item ContratistasControllerTests.cs
+Remove-Item EmpleadoresControllerTests.cs
+Remove-Item SuscripcionesYPagosControllerTests.cs
+
+# Compilar (debería compilar con 0 errores)
+dotnet build
+```
+
+**Beneficio:** Proyecto compila, se puede trabajar en otros features
+
+#### OPCIÓN 2: Reescribir Tests desde Cero (CORRECTO - 3-4 horas)
+
+1. Leer TODOS los Commands reales en `Application/Features/**/*.Commands`
+2. Crear tabla de mapping: Test → Command Real → Estructura
+3. Reescribir tests uno por uno usando estructuras correctas
+4. Agregar mocks faltantes en TestWebApplicationFactory (CardnetServiceMock, etc.)
+5. Validar cada test compila antes de continuar
+
+**Beneficio:** Tests funcionales y mantenibles
+
+#### OPCIÓN 3: Tests Mínimos Vitales (PRAGMÁTICO - 1-2 horas)
+
+Crear solo tests para flujos críticos:
+
+```csharp
+// AuthControllerMinimalTests.cs
+[Fact]
+public async Task Register_Login_Works()
+{
+    // Register
+    var registerCmd = new RegisterCommand { Email = "test@test.com", Password = "Test@123", ... };
+    var registerResp = await Client.PostAsJsonAsync("/api/auth/register", registerCmd);
+    registerResp.IsSuccessStatusCode.Should().BeTrue();
+    
+    // Login
+    var loginCmd = new LoginCommand { Email = "test@test.com", Password = "Test@123", ... };
+    var loginResp = await Client.PostAsJsonAsync("/api/auth/login", loginCmd);
+    loginResp.IsSuccessStatusCode.Should().BeTrue();
+}
+```
+
+**Beneficio:** Coverage básico sin perder mucho tiempo
+
+---
+
+## 📋 Comandos Correctos Identificados
+
+### Authentication Module
+
+```csharp
+// ✅ CORRECTO
+public record RegisterCommand(string Email, string Password, string Nombre, string Apellido, int Tipo, string Host) : IRequest<RegisterResult>;
+
+public record LoginCommand { string Email, string Password, string IpAddress }
+
+public record ChangePasswordCommand(string Email, string UserId, string NewPassword) : IRequest<ChangePasswordResult>;
+```
+
+### Contratistas Module
+
+```csharp
+// ✅ CORRECTO  
+public record UpdateContratistaCommand(
+    string UserId,
+    string? Titulo = null,
+    string? Sector = null,
+    int? Experiencia = null,
+    string? Presentacion = null,
+    string? Provincia = null,
+    bool? NivelNacional = null,
+    string? Telefono1 = null,
+    bool? Whatsapp1 = null,
+    string? Telefono2 = null,
+    bool? Whatsapp2 = null,
+    string? Email = null
+) : IRequest;
+
+// ❌ PROPIEDADES QUE NO EXISTEN en Contratista entity:
+// - FechaNacimiento
+// - Sexo  
+// - Direccion
+// - EstadoCivil
+// - Nacionalidad
+```
+
+### Suscripciones/Pagos Module
+
+```csharp
+// ✅ CORRECTO
+public record ProcesarVentaCommand : IRequest<int>
+{
+    public string UserId { get; init; }
+    public int PlanId { get; init; }
+    public string CardNumber { get; init; }
+    public string Cvv { get; init; }
+    public string ExpirationDate { get; init; } // MMYY
+    public string? ClientIp { get; init; }
+    public string? ReferenceNumber { get; init; }
+    public string? InvoiceNumber { get; init; }
+}
+
+// ❌ NO EXISTE: ProcessPaymentCommand
+```
+
+---
+
+## 🎯 RECOMENDACIÓN FINAL
+
+**Para Usuario:** Elegir OPCIÓN 1 (eliminar tests temporalmente) si necesita que el proyecto compile YA.
+
+**Para Desarrollo Serio:** OPCIÓN 2 (reescribir desde cero) es la única forma de tener tests confiables.
+
+**Para Coverage Rápido:** OPCIÓN 3 (tests mínimos) balancea tiempo vs valor.
+
+**Próxima Acción:** Usuario debe decidir qué opción seguir según prioridades del proyecto.
+
+---
+
+**Última Actualización:** 26 de Octubre 2025, Sesión Manual

@@ -1,310 +1,312 @@
 {
-  "folders": [
-    {
-      "name": "� Documentación y Prompts",
-      "path": "."
-    },
-    {
-      "name": "�🔷 MiGente Legacy (Web Forms)",
-      "path": "Codigo Fuente Mi Gente"
-    },
-    {
-      "name": "🚀 MiGente Clean Architecture",
-      "path": "MiGenteEnLinea.Clean"
-    }
-  ],
-  "settings": {
-    "files.exclude": {
-      "**/bin": true,
-      "**/obj": true,
-      "**/.vs": true,
-      "**/node_modules": true,
-      "**/__pycache__": true
-    },
-    "search.exclude": {
-      "**/bin": true,
-      "**/obj": true,
-      "**/node_modules": true
-    },
-    "editor.formatOnSave": false,
-    "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit",
-      "source.organizeImports": "explicit"
-    },
-    "csharp.semanticHighlighting.enabled": true,
-    "omnisharp.enableRoslynAnalyzers": true,
-    "omnisharp.enableEditorConfigSupport": true,
-    "files.associations": {
-      "*.cshtml": "html",
-      "*.aspx": "html",
-      "*.ascx": "html",
-      "*.master": "html"
-    },
-    "emmet.includeLanguages": {
-      "aspx": "html",
-      "ascx": "html"
-    },
-    "[csharp]": {
-      "editor.defaultFormatter": "ms-dotnettools.csharp",
-      "editor.tabSize": 4,
-      "editor.insertSpaces": true
-    },
-    "[json]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode",
-      "editor.tabSize": 2
-    },
-    "[markdown]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode",
-      "editor.wordWrap": "on"
-    },
-    "todo-tree.general.tags": [
-      "TODO",
-      "FIXME",
-      "HACK",
-      "NOTE",
-      "SECURITY",
-      "BUG",
-      "REFACTOR"
-    ],
-    "todo-tree.highlights.defaultHighlight": {
-      "icon": "alert",
-      "type": "text",
-      "foreground": "#FFFFFF",
-      "background": "#FF0000",
-      "opacity": 50
-    },
-    "todo-tree.highlights.customHighlight": {
-      "TODO": {
-        "icon": "check",
-        "foreground": "#FFFFFF",
-        "background": "#FFA500"
-      },
-      "FIXME": {
-        "icon": "tools",
-        "foreground": "#FFFFFF",
-        "background": "#FF0000"
-      },
-      "SECURITY": {
-        "icon": "shield",
-        "foreground": "#FFFFFF",
-        "background": "#DC143C"
-      },
-      "BUG": {
-        "icon": "bug",
-        "foreground": "#FFFFFF",
-        "background": "#FF4500"
-      },
-      "REFACTOR": {
-        "icon": "refresh",
-        "foreground": "#FFFFFF",
-        "background": "#4169E1"
-      }
-    },
-    "git.autofetch": true,
-    "git.confirmSync": false,
-    "git.enableSmartCommit": true,
-    "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
-    "dotnet.preferCSharpExtension": true,
-    "chat.agent.maxRequests": 100,
-    "chat.agentSessionsViewLocation": "view",
-    "github.copilot.chat.agent.thinkingTool": true,
-    "chat.useNestedAgentsMdFiles": true,
-    "inlineChat.notebookAgent": true,
-    "chat.todoListTool.writeOnly": true,
-    "github.copilot.chat.codesearch.enabled": true,
-    "github.copilot.chat.executePrompt.enabled": true,
-    "powershell.cwd": "🚀 MiGente Clean Architecture",
-    "chat.useCloudButtonV2": true,
-    "inlineChat.enableV2": true,
-    "inlineChat.finishOnType": false,
-    "inlineChat.hideOnRequest": true,
-    "inlineChat.lineEmptyHint": true,
-    "chat.mcp.discovery.enabled": {
-        "claude-desktop": true,
-        "cursor-global": true,
-        "windsurf": true,
-        "cursor-workspace": true
-    },
-    "chat.mcp.gallery.enabled": true,
-    "chat.mcp.assisted.nuget.enabled": true,
-    "chat.edits2.enabled": true,
-    "chat.emptyState.history.enabled": true,
-    "chat.checkpoints.showFileChanges": true,
-    "dotnet.defaultSolution": "🚀 MiGente Clean Architecture/MiGenteEnLinea.Clean.sln"
-  },
-  "extensions": {
-    "recommendations": [
-      "ms-dotnettools.csharp",
-      "ms-dotnettools.csdevkit",
-      "jmrog.vscode-nuget-package-manager",
-      "kreativ-software.csharpextensions",
-      "patcx.vscode-nuget-gallery",
-      "formulahendry.dotnet-test-explorer",
-      "ms-azuretools.vscode-docker",
-      "esbenp.prettier-vscode",
-      "dbaeumer.vscode-eslint",
-      "gruntfuggly.todo-tree",
-      "eamodio.gitlens",
-      "github.copilot",
-      "github.copilot-chat",
-      "pkief.material-icon-theme",
-      "zhuangtongfa.material-theme",
-      "oderwat.indent-rainbow",
-      "streetsidesoftware.code-spell-checker",
-      "wayou.vscode-todo-highlight",
-      "ryanluker.vscode-coverage-gutters",
-      "ms-vscode.powershell"
-    ]
-  },
-  "launch": {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "name": "🚀 Launch Clean API",
-        "type": "coreclr",
-        "request": "launch",
-        "preLaunchTask": "build-clean-api",
-        "program": "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API/bin/Debug/net8.0/MiGenteEnLinea.API.dll",
-        "args": [],
-        "cwd": "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API",
-        "stopAtEntry": false,
-        "serverReadyAction": {
-          "action": "openExternally",
-          "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
-          "uriFormat": "%s/swagger"
+    "folders": [
+        {
+            "name": "� Documentación y Prompts",
+            "path": "."
         },
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development",
-          "ASPNETCORE_URLS": "https://localhost:5001;http://localhost:5000"
+        {
+            "name": "�🔷 MiGente Legacy (Web Forms)",
+            "path": "Codigo Fuente Mi Gente"
         },
-        "sourceFileMap": {
-          "/Views": "${workspaceFolder:🚀 MiGente Clean Architecture}/Views"
+        {
+            "name": "🚀 MiGente Clean Architecture",
+            "path": "MiGenteEnLinea.Clean"
         }
-      },
-      {
-        "name": "🔷 Launch Legacy Web Forms (IIS Express)",
-        "type": "coreclr",
-        "request": "launch",
-        "program": "C:\\Program Files\\IIS Express\\iisexpress.exe",
-        "args": [
-          "/path:${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente_Front",
-          "/port:44358",
-          "/systray:false"
+    ],
+    "settings": {
+        "files.exclude": {
+            "**/bin": true,
+            "**/obj": true,
+            "**/.vs": true,
+            "**/node_modules": true,
+            "**/__pycache__": true
+        },
+        "search.exclude": {
+            "**/bin": true,
+            "**/obj": true,
+            "**/node_modules": true
+        },
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        },
+        "csharp.semanticHighlighting.enabled": true,
+        "omnisharp.enableRoslynAnalyzers": true,
+        "omnisharp.enableEditorConfigSupport": true,
+        "files.associations": {
+            "*.cshtml": "html",
+            "*.aspx": "html",
+            "*.ascx": "html",
+            "*.master": "html"
+        },
+        "emmet.includeLanguages": {
+            "aspx": "html",
+            "ascx": "html"
+        },
+        "[csharp]": {
+            "editor.defaultFormatter": "ms-dotnettools.csharp",
+            "editor.tabSize": 4,
+            "editor.insertSpaces": true
+        },
+        "[json]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[markdown]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.wordWrap": "on"
+        },
+        "todo-tree.general.tags": [
+            "TODO",
+            "FIXME",
+            "HACK",
+            "NOTE",
+            "SECURITY",
+            "BUG",
+            "REFACTOR"
         ],
-        "cwd": "${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente_Front",
-        "stopAtEntry": false,
-        "serverReadyAction": {
-          "action": "openExternally",
-          "pattern": "^\\s*Now listening on:\\s+(https?://\\S+)",
-          "uriFormat": "%s"
+        "todo-tree.highlights.defaultHighlight": {
+            "icon": "alert",
+            "type": "text",
+            "foreground": "#FFFFFF",
+            "background": "#FF0000",
+            "opacity": 50
         },
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    ],
-    "compounds": [
-      {
-        "name": "🔥 Launch Both Projects",
-        "configurations": [
-          "🚀 Launch Clean API",
-          "🔷 Launch Legacy Web Forms (IIS Express)"
+        "todo-tree.highlights.customHighlight": {
+            "TODO": {
+                "icon": "check",
+                "foreground": "#FFFFFF",
+                "background": "#FFA500"
+            },
+            "FIXME": {
+                "icon": "tools",
+                "foreground": "#FFFFFF",
+                "background": "#FF0000"
+            },
+            "SECURITY": {
+                "icon": "shield",
+                "foreground": "#FFFFFF",
+                "background": "#DC143C"
+            },
+            "BUG": {
+                "icon": "bug",
+                "foreground": "#FFFFFF",
+                "background": "#FF4500"
+            },
+            "REFACTOR": {
+                "icon": "refresh",
+                "foreground": "#FFFFFF",
+                "background": "#4169E1"
+            }
+        },
+        "git.autofetch": true,
+        "git.confirmSync": false,
+        "git.enableSmartCommit": true,
+        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+        "dotnet.preferCSharpExtension": true,
+        "chat.agent.maxRequests": 200,
+        "chat.agentSessionsViewLocation": "view",
+        "github.copilot.chat.agent.thinkingTool": true,
+        "chat.useNestedAgentsMdFiles": true,
+        "inlineChat.notebookAgent": true,
+        "chat.todoListTool.writeOnly": true,
+        "github.copilot.chat.codesearch.enabled": true,
+        "github.copilot.chat.executePrompt.enabled": true,
+        "powershell.cwd": "🚀 MiGente Clean Architecture",
+        "chat.useCloudButtonV2": true,
+        "inlineChat.enableV2": true,
+        "inlineChat.finishOnType": false,
+        "inlineChat.hideOnRequest": true,
+        "inlineChat.lineEmptyHint": true,
+        "chat.mcp.discovery.enabled": {
+            "claude-desktop": true,
+            "cursor-global": true,
+            "windsurf": true,
+            "cursor-workspace": true
+        },
+        "chat.mcp.gallery.enabled": true,
+        "chat.mcp.assisted.nuget.enabled": true,
+        "chat.edits2.enabled": true,
+        "chat.emptyState.history.enabled": true,
+        "chat.checkpoints.showFileChanges": true,
+        "dotnet.defaultSolution": "🚀 MiGente Clean Architecture/MiGenteEnLinea.Clean.sln",
+        "chat.allowAnonymousAccess": true,
+        "chat.commandCenter.enabled": true
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-dotnettools.csharp",
+            "ms-dotnettools.csdevkit",
+            "jmrog.vscode-nuget-package-manager",
+            "kreativ-software.csharpextensions",
+            "patcx.vscode-nuget-gallery",
+            "formulahendry.dotnet-test-explorer",
+            "ms-azuretools.vscode-docker",
+            "esbenp.prettier-vscode",
+            "dbaeumer.vscode-eslint",
+            "gruntfuggly.todo-tree",
+            "eamodio.gitlens",
+            "github.copilot",
+            "github.copilot-chat",
+            "pkief.material-icon-theme",
+            "zhuangtongfa.material-theme",
+            "oderwat.indent-rainbow",
+            "streetsidesoftware.code-spell-checker",
+            "wayou.vscode-todo-highlight",
+            "ryanluker.vscode-coverage-gutters",
+            "ms-vscode.powershell"
         ]
-      }
-    ]
-  },
-  "tasks": {
-    "version": "2.0.0",
-    "tasks": [
-      {
-        "label": "build-clean-api",
-        "command": "dotnet",
-        "type": "process",
-        "args": [
-          "build",
-          "${workspaceFolder:🚀 MiGente Clean Architecture}/MiGenteEnLinea.Clean.sln",
-          "/property:GenerateFullPaths=true",
-          "/consoleloggerparameters:NoSummary"
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "🚀 Launch Clean API",
+                "type": "coreclr",
+                "request": "launch",
+                "preLaunchTask": "build-clean-api",
+                "program": "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API/bin/Debug/net8.0/MiGenteEnLinea.API.dll",
+                "args": [],
+                "cwd": "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API",
+                "stopAtEntry": false,
+                "serverReadyAction": {
+                    "action": "openExternally",
+                    "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+                    "uriFormat": "%s/swagger"
+                },
+                "env": {
+                    "ASPNETCORE_ENVIRONMENT": "Development",
+                    "ASPNETCORE_URLS": "https://localhost:5001;http://localhost:5000"
+                },
+                "sourceFileMap": {
+                    "/Views": "${workspaceFolder:🚀 MiGente Clean Architecture}/Views"
+                }
+            },
+            {
+                "name": "🔷 Launch Legacy Web Forms (IIS Express)",
+                "type": "coreclr",
+                "request": "launch",
+                "program": "C:\\Program Files\\IIS Express\\iisexpress.exe",
+                "args": [
+                    "/path:${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente_Front",
+                    "/port:44358",
+                    "/systray:false"
+                ],
+                "cwd": "${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente_Front",
+                "stopAtEntry": false,
+                "serverReadyAction": {
+                    "action": "openExternally",
+                    "pattern": "^\\s*Now listening on:\\s+(https?://\\S+)",
+                    "uriFormat": "%s"
+                },
+                "env": {
+                    "ASPNETCORE_ENVIRONMENT": "Development"
+                }
+            }
         ],
-        "problemMatcher": "$msCompile",
-        "group": {
-          "kind": "build",
-          "isDefault": true
-        }
-      },
-      {
-        "label": "build-legacy",
-        "command": "msbuild",
-        "type": "shell",
-        "args": [
-          "${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente.sln",
-          "/p:Configuration=Debug"
+        "compounds": [
+            {
+                "name": "🔥 Launch Both Projects",
+                "configurations": [
+                    "🚀 Launch Clean API",
+                    "🔷 Launch Legacy Web Forms (IIS Express)"
+                ]
+            }
+        ]
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "build-clean-api",
+                "command": "dotnet",
+                "type": "process",
+                "args": [
+                    "build",
+                    "${workspaceFolder:🚀 MiGente Clean Architecture}/MiGenteEnLinea.Clean.sln",
+                    "/property:GenerateFullPaths=true",
+                    "/consoleloggerparameters:NoSummary"
+                ],
+                "problemMatcher": "$msCompile",
+                "group": {
+                    "kind": "build",
+                    "isDefault": true
+                }
+            },
+            {
+                "label": "build-legacy",
+                "command": "msbuild",
+                "type": "shell",
+                "args": [
+                    "${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente.sln",
+                    "/p:Configuration=Debug"
+                ],
+                "problemMatcher": "$msCompile",
+                "group": "build"
+            },
+            {
+                "label": "test-clean",
+                "command": "dotnet",
+                "type": "process",
+                "args": [
+                    "test",
+                    "${workspaceFolder:🚀 MiGente Clean Architecture}/MiGenteEnLinea.Clean.sln"
+                ],
+                "problemMatcher": "$msCompile",
+                "group": "test"
+            },
+            {
+                "label": "ef-migrations-add",
+                "command": "dotnet",
+                "type": "shell",
+                "args": [
+                    "ef",
+                    "migrations",
+                    "add",
+                    "${input:migrationName}",
+                    "--startup-project",
+                    "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API",
+                    "--project",
+                    "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Infrastructure/MiGenteEnLinea.Infrastructure",
+                    "--context",
+                    "MiGenteDbContext",
+                    "--output-dir",
+                    "Persistence/Migrations"
+                ],
+                "problemMatcher": []
+            },
+            {
+                "label": "ef-database-update",
+                "command": "dotnet",
+                "type": "shell",
+                "args": [
+                    "ef",
+                    "database",
+                    "update",
+                    "--startup-project",
+                    "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API",
+                    "--project",
+                    "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Infrastructure/MiGenteEnLinea.Infrastructure",
+                    "--context",
+                    "MiGenteDbContext"
+                ],
+                "problemMatcher": []
+            },
+            {
+                "label": "restore-all",
+                "type": "shell",
+                "command": "dotnet restore ${workspaceFolder:🚀 MiGente Clean Architecture}/MiGenteEnLinea.Clean.sln && nuget restore ${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente.sln",
+                "problemMatcher": []
+            }
         ],
-        "problemMatcher": "$msCompile",
-        "group": "build"
-      },
-      {
-        "label": "test-clean",
-        "command": "dotnet",
-        "type": "process",
-        "args": [
-          "test",
-          "${workspaceFolder:🚀 MiGente Clean Architecture}/MiGenteEnLinea.Clean.sln"
-        ],
-        "problemMatcher": "$msCompile",
-        "group": "test"
-      },
-      {
-        "label": "ef-migrations-add",
-        "command": "dotnet",
-        "type": "shell",
-        "args": [
-          "ef",
-          "migrations",
-          "add",
-          "${input:migrationName}",
-          "--startup-project",
-          "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API",
-          "--project",
-          "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Infrastructure/MiGenteEnLinea.Infrastructure",
-          "--context",
-          "MiGenteDbContext",
-          "--output-dir",
-          "Persistence/Migrations"
-        ],
-        "problemMatcher": []
-      },
-      {
-        "label": "ef-database-update",
-        "command": "dotnet",
-        "type": "shell",
-        "args": [
-          "ef",
-          "database",
-          "update",
-          "--startup-project",
-          "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Presentation/MiGenteEnLinea.API",
-          "--project",
-          "${workspaceFolder:🚀 MiGente Clean Architecture}/src/Infrastructure/MiGenteEnLinea.Infrastructure",
-          "--context",
-          "MiGenteDbContext"
-        ],
-        "problemMatcher": []
-      },
-      {
-        "label": "restore-all",
-        "type": "shell",
-        "command": "dotnet restore ${workspaceFolder:🚀 MiGente Clean Architecture}/MiGenteEnLinea.Clean.sln && nuget restore ${workspaceFolder:🔷 MiGente Legacy (Web Forms)}/MiGente.sln",
-        "problemMatcher": []
-      }
-    ],
-    "inputs": [
-      {
-        "id": "migrationName",
-        "type": "promptString",
-        "description": "Enter migration name (e.g., AddUserEmailColumn)",
-        "default": "Migration"
-      }
-    ]
-  }
+        "inputs": [
+            {
+                "id": "migrationName",
+                "type": "promptString",
+                "description": "Enter migration name (e.g., AddUserEmailColumn)",
+                "default": "Migration"
+            }
+        ]
+    }
 }

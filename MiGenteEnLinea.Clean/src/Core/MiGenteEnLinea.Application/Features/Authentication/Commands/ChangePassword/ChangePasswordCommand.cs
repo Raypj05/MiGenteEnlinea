@@ -8,9 +8,11 @@ namespace MiGenteEnLinea.Application.Features.Authentication.Commands.ChangePass
 /// </summary>
 /// <remarks>
 /// Migrado desde: SuscripcionesService.cs -> actualizarPass(Credenciales c)
+/// Identity requiere validar la contraseña actual antes de cambiarla
 /// </remarks>
 public record ChangePasswordCommand(
     string Email,
     string UserId,
+    string CurrentPassword,
     string NewPassword
 ) : IRequest<ChangePasswordResult>;

@@ -138,11 +138,13 @@ public sealed class Credencial : AggregateRoot
     /// <summary>
     /// DOMAIN METHOD: Desactiva la credencial
     /// Se usa cuando se suspende una cuenta o se elimina un usuario
+    /// IDEMPOTENTE: No lanza excepción si ya está desactivada
     /// </summary>
     public void Desactivar()
     {
+        // Idempotente: simplemente asegurar que Activo = false
         if (!Activo)
-            throw new InvalidOperationException("La credencial ya está desactivada");
+            return; // Ya está desactivada, no hacer nada
 
         Activo = false;
     }
@@ -198,5 +200,18 @@ public sealed class Credencial : AggregateRoot
             throw new ArgumentNullException(nameof(nuevoEmail));
 
         Email = nuevoEmail;
+    }
+
+    /// <summary>
+    /// DOMAIN METHOD: Actualiza la fecha del último login
+    /// Usado por LegacyIdentityService para trackear logins exitosos
+    /// </summary>
+    public void ActualizarUltimoLogin(DateTime fechaLogin, string? ipAddress = null)
+    {
+        UltimoAcceso = fechaLogin;
+        if (ipAddress != null)
+        {
+            UltimaIp = ipAddress;
+        }
     }
 }

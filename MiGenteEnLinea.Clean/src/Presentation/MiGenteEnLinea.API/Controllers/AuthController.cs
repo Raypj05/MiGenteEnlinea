@@ -5,12 +5,14 @@ using MiGenteEnLinea.Application.Features.Authentication.Commands.ActivateAccoun
 using MiGenteEnLinea.Application.Features.Authentication.Commands.AddProfileInfo;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ChangePassword;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ChangePasswordById;
+using MiGenteEnLinea.Application.Features.Authentication.Commands.DeleteUser;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.DeleteUserCredential;
+using MiGenteEnLinea.Application.Features.Authentication.Commands.ForgotPassword;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.Login;
-using MiGenteEnLinea.Application.Features.Seguridad.Credenciales.Commands.DeleteUser;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.RefreshToken;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.Register;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ResendActivationEmail;
+using MiGenteEnLinea.Application.Features.Authentication.Commands.ResetPassword;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.RevokeToken;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.UpdateCredencial;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.UpdateProfile;
@@ -453,23 +455,23 @@ public class AuthController : ControllerBase
     /// - 2 = Contratista
     /// </remarks>
     [HttpPost("register")]
-    [ProducesResponseType(typeof(int), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(RegisterResult), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<int>> Register([FromBody] RegisterCommand command)
+    public async Task<ActionResult<RegisterResult>> Register([FromBody] RegisterCommand command)
     {
         _logger.LogInformation("POST /api/auth/register - Email: {Email}, Tipo: {Tipo}", command.Email, command.Tipo);
 
         try
         {
-            var perfilId = await _mediator.Send(command);
+            var result = await _mediator.Send(command);
 
-            _logger.LogInformation("Usuario registrado exitosamente - PerfilId: {PerfilId}", perfilId);
+            _logger.LogInformation("Usuario registrado exitosamente - UserId: {UserId}", result.UserId);
 
             return CreatedAtAction(
                 nameof(GetPerfil),
-                new { userId = perfilId.ToString() },
-                new { perfilId, message = "Usuario registrado exitosamente. Por favor revise su correo para activar su cuenta." });
+                new { userId = result.UserId },
+                result);
         }
         catch (InvalidOperationException ex)
         {
@@ -1353,7 +1355,7 @@ public class AuthController : ControllerBase
 
         try
         {
-            var command = new DeleteUserCommand(userId, credencialId);
+            var command = new DeleteUserCommand { UserID = userId, CredencialID = credencialId };
             await _mediator.Send(command);
 
             _logger.LogInformation(
@@ -1376,5 +1378,158 @@ public class AuthController : ControllerBase
                 new { message = "Error interno al procesar la solicitud" });
         }
     }
+
+    #region Password Recovery Endpoints
+
+    /// <summary>
+    /// Solicitar recuperación de contraseña (envía token por email)
+    /// </summary>
+    /// <param name="command">Email del usuario</param>
+    /// <returns>Confirmación de envío</returns>
+    /// <response code="200">Token enviado por email</response>
+    /// <response code="404">Usuario no encontrado</response>
+    /// <response code="400">Email inválido</response>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ForgotPassword([FromBody] MiGenteEnLinea.Application.Features.Authentication.Commands.ForgotPassword.ForgotPasswordCommand command)
+    {
+        _logger.LogInformation("POST /api/auth/forgot-password - Email: {Email}", command.Email);
+
+        try
+        {
+            var success = await _mediator.Send(command);
+
+            if (!success)
+            {
+                _logger.LogWarning("ForgotPassword fallido - Email no encontrado: {Email}", command.Email);
+                return NotFound(new { message = "No se encontró un usuario con ese email." });
+            }
+
+            _logger.LogInformation("Token de recuperación enviado - Email: {Email}", command.Email);
+            return Ok(new { message = "Se ha enviado un código de recuperación a su email." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al procesar forgot-password - Email: {Email}", command.Email);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Resetear contraseña con token de recuperación
+    /// </summary>
+    /// <param name="command">Email, token y nueva contraseña</param>
+    /// <returns>Confirmación de cambio</returns>
+    /// <response code="200">Contraseña cambiada exitosamente</response>
+    /// <response code="400">Token inválido o expirado</response>
+    /// <response code="404">Usuario no encontrado</response>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> ResetPassword([FromBody] MiGenteEnLinea.Application.Features.Authentication.Commands.ResetPassword.ResetPasswordCommand command)
+    {
+        _logger.LogInformation("POST /api/auth/reset-password - Email: {Email}", command.Email);
+
+        try
+        {
+            var success = await _mediator.Send(command);
+
+            if (!success)
+            {
+                _logger.LogWarning("ResetPassword fallido - Token inválido o expirado: {Email}", command.Email);
+                return BadRequest(new { message = "Token inválido o expirado." });
+            }
+
+            _logger.LogInformation("Contraseña reseteada exitosamente - Email: {Email}", command.Email);
+            return Ok(new { message = "Contraseña cambiada exitosamente. Ya puede iniciar sesión." });
+        }
+        catch (NotFoundException ex)
+        {
+            _logger.LogWarning("ResetPassword - Usuario no encontrado: {Message}", ex.Message);
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al resetear contraseña - Email: {Email}", command.Email);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region User Management Endpoints
+
+    /// <summary>
+    /// Eliminar usuario (soft delete - marca Activo = false)
+    /// </summary>
+    /// <param name="command">UserID y CredencialID</param>
+    /// <returns>Confirmación de eliminación</returns>
+    /// <response code="200">Usuario eliminado</response>
+    /// <response code="404">Usuario no encontrado</response>
+    [HttpPost("delete-user")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> DeleteUserSoft([FromBody] DeleteUserCommand command)
+    {
+        _logger.LogInformation("POST /api/auth/delete-user - UserID: {UserID}", command.UserID);
+
+        try
+        {
+            var success = await _mediator.Send(command);
+
+            if (!success)
+            {
+                _logger.LogWarning("DeleteUser fallido - Usuario no encontrado: {UserID}", command.UserID);
+                return NotFound(new { message = "Usuario no encontrado." });
+            }
+
+            _logger.LogInformation("Usuario eliminado exitosamente - UserID: {UserID}", command.UserID);
+            return Ok(new { message = "Usuario eliminado exitosamente." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al eliminar usuario - UserID: {UserID}", command.UserID);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cambiar contraseña por ID de credencial (GAP-014)
+    /// </summary>
+    /// <param name="command">CredencialId y nueva contraseña</param>
+    /// <returns>Confirmación de cambio</returns>
+    /// <response code="200">Contraseña cambiada</response>
+    /// <response code="404">Credencial no encontrada</response>
+    [HttpPost("change-password-by-id")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> ChangePasswordById([FromBody] ChangePasswordByIdCommand command)
+    {
+        _logger.LogInformation("POST /api/auth/change-password-by-id - CredencialId: {CredencialId}", command.CredencialId);
+
+        try
+        {
+            var success = await _mediator.Send(command);
+
+            if (!success)
+            {
+                _logger.LogWarning("ChangePasswordById fallido - Credencial no encontrada: {CredencialId}", command.CredencialId);
+                return NotFound(new { message = "Credencial no encontrada." });
+            }
+
+            _logger.LogInformation("Contraseña cambiada exitosamente - CredencialId: {CredencialId}", command.CredencialId);
+            return Ok(new { message = "Contraseña cambiada exitosamente." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al cambiar contraseña - CredencialId: {CredencialId}", command.CredencialId);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    #endregion
 }
 

@@ -52,9 +52,23 @@ public interface IIdentityService
     Task<bool> UserExistsAsync(string email);
 
     /// <summary>
-    /// Confirma el email de un usuario (activación de cuenta)
+    /// Confirma el email de un usuario (activación de cuenta) usando token
     /// </summary>
     Task<bool> ConfirmEmailAsync(string userId, string token);
+
+    /// <summary>
+    /// Activa cuenta de usuario sin token (Legacy compatibility)
+    /// Solo valida que el userId y email coincidan, luego activa EmailConfirmed
+    /// </summary>
+    Task<bool> ActivateAccountAsync(string userId, string email);
+
+    /// <summary>
+    /// Cambia la contraseña de un usuario
+    /// </summary>
+    /// <param name="userId">ID del usuario</param>
+    /// <param name="currentPassword">Contraseña actual</param>
+    /// <param name="newPassword">Nueva contraseña</param>
+    Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword);
 
     /// <summary>
     /// Genera token para reset de contraseña
@@ -65,4 +79,50 @@ public interface IIdentityService
     /// Resetea la contraseña de un usuario
     /// </summary>
     Task<bool> ResetPasswordAsync(string email, string token, string newPassword);
+
+    // ========================================
+    // MÉTODOS ADICIONALES PARA SINCRONIZACIÓN IDENTITY + LEGACY
+    // GAP-001, GAP-014, GAP-015
+    // ========================================
+
+    /// <summary>
+    /// Desactiva un usuario bloqueándolo permanentemente (Soft Delete)
+    /// Sets LockoutEnd to DateTimeOffset.MaxValue to permanently disable login
+    /// </summary>
+    /// <param name="userId">ID del usuario a desactivar</param>
+    /// <returns>True si se desactivó exitosamente</returns>
+    Task<bool> LockoutUserAsync(string userId);
+
+    /// <summary>
+    /// Desactiva un usuario completamente (Soft Delete)
+    /// Alternative to LockoutUserAsync - marks user as inactive preventing all access
+    /// This is the PRIMARY method for soft delete operations
+    /// </summary>
+    /// <param name="userId">ID del usuario a desactivar</param>
+    /// <returns>True si se desactivó exitosamente</returns>
+    Task<bool> DeactivateUserAsync(string userId);
+
+    /// <summary>
+    /// Cambia la contraseña de un usuario sin validar la contraseña anterior
+    /// (Para cambios administrativos o reset después de token validado)
+    /// </summary>
+    /// <param name="userId">ID del usuario</param>
+    /// <param name="newPassword">Nueva contraseña</param>
+    /// <returns>True si se cambió exitosamente</returns>
+    Task<bool> ChangePasswordByIdAsync(string userId, string newPassword);
+
+    /// <summary>
+    /// Actualiza el email de un usuario en Identity
+    /// </summary>
+    /// <param name="userId">ID del usuario</param>
+    /// <param name="newEmail">Nuevo email</param>
+    /// <returns>True si se actualizó exitosamente</returns>
+    Task<bool> UpdateUserEmailAsync(string userId, string newEmail);
+
+    /// <summary>
+    /// Obtiene información básica de un usuario por ID
+    /// </summary>
+    /// <param name="userId">ID del usuario</param>
+    /// <returns>Email y estado activo del usuario, o null si no existe</returns>
+    Task<(string Email, bool IsActive)?> GetUserByIdAsync(string userId);
 }

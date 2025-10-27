@@ -504,9 +504,10 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var freshContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
         
-        var deletedCredencial = await freshContext.Credenciales
+        var deletedCredencial = await freshContext.CredencialesRefactored
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Email == emailVO);
+        
         deletedCredencial.Should().NotBeNull();
         deletedCredencial!.Activo.Should().BeFalse();
 

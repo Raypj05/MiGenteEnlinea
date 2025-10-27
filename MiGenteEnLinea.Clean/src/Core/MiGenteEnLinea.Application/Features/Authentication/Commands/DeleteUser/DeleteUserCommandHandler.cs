@@ -18,20 +18,17 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
     private readonly IIdentityService _identityService;
     private readonly ICredencialRepository _credencialRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IApplicationDbContext _context; // ✅ Agregar para acceso directo al ChangeTracker
     private readonly ILogger<DeleteUserCommandHandler> _logger;
 
     public DeleteUserCommandHandler(
         IIdentityService identityService,
         ICredencialRepository credencialRepository,
         IUnitOfWork unitOfWork,
-        IApplicationDbContext context, // ✅ Inyectar DbContext
         ILogger<DeleteUserCommandHandler> logger)
     {
         _identityService = identityService;
         _credencialRepository = credencialRepository;
         _unitOfWork = unitOfWork;
-        _context = context; // ✅ Almacenar para acceso al ChangeTracker
         _logger = logger;
     }
 
@@ -92,24 +89,12 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
 
             _logger.LogInformation("[DELETE-HANDLER] AFTER Desactivar(): Activo={Activo}", credencial.Activo);
 
-            // ✅ SOLUCIÓN EF CORE: Marcar explícitamente la propiedad Activo como Modified
-            // IApplicationDbContext es realmente un DbContext, castear para acceso al ChangeTracker
-            var dbContext = _context as DbContext;
-            if (dbContext != null)
-            {
-                var entry = dbContext.Entry(credencial);
-                entry.Property(nameof(credencial.Activo)).IsModified = true;
-                
-                _logger.LogInformation("[DELETE-HANDLER] EF Core Entry State: {State}, Activo IsModified: {IsModified}", 
-                    entry.State, entry.Property(nameof(credencial.Activo)).IsModified);
-            }
-            else
-            {
-                // Fallback: llamar Update() explícitamente
-                _credencialRepository.Update(credencial);
-            }
+            // ✅ CRITICAL FIX: Siempre llamar Update() explícitamente (mismo pattern que ActivateAccount)
+            // EF Core no detecta automáticamente cambios en propiedades con private set
+            _credencialRepository.Update(credencial);
 
-            // Guardar cambios (EF Core ahora SABE que Activo cambió)
+            // Guardar cambios
+            _logger.LogInformation("[DELETE-HANDLER] Calling SaveChangesAsync...");
             var changesSaved = await _unitOfWork.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("[DELETE-HANDLER] SaveChanges completed. Changes saved: {ChangesSaved}", changesSaved);
 

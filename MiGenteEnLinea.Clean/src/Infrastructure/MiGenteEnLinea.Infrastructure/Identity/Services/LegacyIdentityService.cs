@@ -237,4 +237,39 @@ public class LegacyIdentityService : IIdentityService
         _logger.LogWarning("ResetPasswordAsync not implemented yet in LegacyIdentityService");
         throw new NotImplementedException("Reset password no implementado aún");
     }
+
+    // ========================================
+    // MÉTODOS ADICIONALES PARA SINCRONIZACIÓN IDENTITY + LEGACY
+    // Stubs - LegacyIdentityService is being deprecated in favor of IdentityService
+    // ========================================
+
+    public async Task<bool> LockoutUserAsync(string userId)
+    {
+        _logger.LogWarning("LockoutUserAsync called on LegacyIdentityService - use IdentityService instead");
+        throw new NotImplementedException("Use IdentityService for Identity operations");
+    }
+
+    public async Task<bool> DeactivateUserAsync(string userId)
+    {
+        _logger.LogWarning("DeactivateUserAsync called on LegacyIdentityService - use IdentityService instead");
+        throw new NotImplementedException("Use IdentityService for Identity operations");
+    }
+
+    public async Task<bool> ChangePasswordByIdAsync(string userId, string newPassword)
+    {
+        _logger.LogWarning("ChangePasswordByIdAsync called on LegacyIdentityService - use IdentityService instead");
+        throw new NotImplementedException("Use IdentityService for Identity operations");
+    }
+
+    public async Task<bool> UpdateUserEmailAsync(string userId, string newEmail)
+    {
+        _logger.LogWarning("UpdateUserEmailAsync called on LegacyIdentityService - use IdentityService instead");
+        throw new NotImplementedException("Use IdentityService for Identity operations");
+    }
+
+    public async Task<(string Email, bool IsActive)?> GetUserByIdAsync(string userId)
+    {
+        _logger.LogWarning("GetUserByIdAsync called on LegacyIdentityService - use IdentityService instead");
+        throw new NotImplementedException("Use IdentityService for Identity operations");
+    }
 }

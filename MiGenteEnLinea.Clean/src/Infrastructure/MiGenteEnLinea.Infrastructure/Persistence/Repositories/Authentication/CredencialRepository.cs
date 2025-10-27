@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MiGenteEnLinea.Domain.Entities.Authentication;
 using MiGenteEnLinea.Domain.Interfaces.Repositories.Authentication;
+using MiGenteEnLinea.Domain.ValueObjects;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
 
 namespace MiGenteEnLinea.Infrastructure.Persistence.Repositories.Authentication;
@@ -17,11 +18,17 @@ public class CredencialRepository : Repository<Credencial>, ICredencialRepositor
 
     /// <summary>
     /// Obtiene credencial por email (case-insensitive)
+    /// Fixed: Comparación directa sin ToLower() para evitar translation issues
     /// </summary>
     public async Task<Credencial?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
-            .FirstOrDefaultAsync(c => c.Email.Value.ToLower() == email.ToLower(), cancellationToken);
+        // Normalizar email ANTES del query para evitar EF Core translation issues
+        var normalizedEmail = email.ToLowerInvariant();
+        
+        // Cargar todas las credenciales y filtrar en memoria (subóptimo pero funciona)
+        // TODO: Investigar HasConversion para Email Value Object
+        var credenciales = await _dbSet.ToListAsync(cancellationToken);
+        return credenciales.FirstOrDefault(c => c.Email.Value.Equals(normalizedEmail, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -35,13 +42,17 @@ public class CredencialRepository : Repository<Credencial>, ICredencialRepositor
 
     /// <summary>
     /// Verifica existencia de email (case-insensitive) - optimizado sin traer entidad
+    /// Fixed: Query en memoria para evitar EF Core translation issues con Value Objects
     /// </summary>
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        // Normalize email before query to avoid EF Core translation issues with Value Object
-        var normalizedEmail = Email.CreateUnsafe(email.ToLowerInvariant());
-        return await _dbSet
-            .AnyAsync(c => c.Email == normalizedEmail, cancellationToken);
+        // Normalizar email ANTES del query
+        var normalizedEmail = email.ToLowerInvariant();
+        
+        // Cargar todos los emails y verificar en memoria
+        // Subóptimo pero evita EF Core translation errors con Value Objects
+        var credenciales = await _dbSet.ToListAsync(cancellationToken);
+        return credenciales.Any(c => c.Email.Value.Equals(normalizedEmail, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

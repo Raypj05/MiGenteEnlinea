@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MiGenteEnLinea.Application.Common.Interfaces;
@@ -51,14 +51,14 @@ public class IdentityService : IIdentityService
         
         // Query legacy Credenciales table (domain entity)
         // NOTA: No usar .Email.Value en LINQ - EF Core no puede traducir Value Objects
-        // En su lugar, EF Core usa HasConversion() automáticamente
+        // En su lugar, EF Core usa HasConversion() autom�ticamente
         var credencialesQuery = await _context.Credenciales.ToListAsync();
         var credencial = credencialesQuery.FirstOrDefault(c => c.Email.Value.Equals(email, StringComparison.OrdinalIgnoreCase));
 
         if (credencial == null)
         {
             _logger.LogWarning("Login failed: User not found in Identity or Legacy for email {Email}", email);
-            throw new UnauthorizedAccessException("Credenciales inválidas");
+            throw new UnauthorizedAccessException("Credenciales inv�lidas");
         }
 
         // Step 3: Validate password against legacy hash (BCrypt)
@@ -67,13 +67,13 @@ public class IdentityService : IIdentityService
         if (!passwordValid)
         {
             _logger.LogWarning("Login failed: Invalid password for legacy user {UserId}", credencial.UserId);
-            throw new UnauthorizedAccessException("Credenciales inválidas");
+            throw new UnauthorizedAccessException("Credenciales inv�lidas");
         }
 
         if (!credencial.Activo)
         {
             _logger.LogWarning("Login failed: Legacy account not active for user {UserId}", credencial.UserId);
-            throw new UnauthorizedAccessException("La cuenta no está activa. Por favor, verifica tu correo electrónico.");
+            throw new UnauthorizedAccessException("La cuenta no est� activa. Por favor, verifica tu correo electr�nico.");
         }
 
         // Query legacy Perfiles table to get additional user info
@@ -100,19 +100,19 @@ public class IdentityService : IIdentityService
         {
             _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
             await _userManager.AccessFailedAsync(user);
-            throw new UnauthorizedAccessException("Credenciales inválidas");
+            throw new UnauthorizedAccessException("Credenciales inv�lidas");
         }
 
         if (!user.EmailConfirmed)
         {
             _logger.LogWarning("Login failed: Account not confirmed for user {UserId}", user.Id);
-            throw new UnauthorizedAccessException("La cuenta no está activa. Por favor, verifica tu correo electrónico.");
+            throw new UnauthorizedAccessException("La cuenta no est� activa. Por favor, verifica tu correo electr�nico.");
         }
 
         if (await _userManager.IsLockedOutAsync(user))
         {
             _logger.LogWarning("Login failed: Account is locked out for user {UserId}", user.Id);
-            throw new UnauthorizedAccessException("La cuenta está bloqueada debido a múltiples intentos fallidos.");
+            throw new UnauthorizedAccessException("La cuenta est� bloqueada debido a m�ltiples intentos fallidos.");
         }
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -171,7 +171,7 @@ public class IdentityService : IIdentityService
         Domain.Entities.Seguridad.Perfile? perfil,
         string plainTextPassword)
     {
-        // Buscar suscripción activa para obtener PlanID y VencimientoPlan
+        // Buscar suscripci�n activa para obtener PlanID y VencimientoPlan
         var suscripcion = await _context.Suscripciones
             .Where(s => s.UserId == credencial.UserId && !s.Cancelada)
             .OrderByDescending(s => s.FechaInicio)
@@ -215,7 +215,7 @@ public class IdentityService : IIdentityService
         if (tokenEntity == null)
         {
             _logger.LogWarning("Refresh token not found: {Token}", refreshToken);
-            throw new UnauthorizedAccessException("Refresh token inválido");
+            throw new UnauthorizedAccessException("Refresh token inv�lido");
         }
 
         if (!tokenEntity.IsActive)
@@ -284,7 +284,7 @@ public class IdentityService : IIdentityService
         if (tokenEntity == null)
         {
             _logger.LogWarning("Refresh token not found for revocation: {Token}", refreshToken);
-            throw new UnauthorizedAccessException("Refresh token inválido");
+            throw new UnauthorizedAccessException("Refresh token inv�lido");
         }
 
         if (!tokenEntity.IsActive)
@@ -307,7 +307,7 @@ public class IdentityService : IIdentityService
         var existingUser = await _userManager.FindByEmailAsync(email);
         if (existingUser != null)
         {
-            throw new InvalidOperationException("El email ya está registrado");
+            throw new InvalidOperationException("El email ya est� registrado");
         }
 
         var user = new ApplicationUser
@@ -373,11 +373,11 @@ public class IdentityService : IIdentityService
             return false;
         }
 
-        // Verificar si ya está activado
+        // Verificar si ya est� activado
         if (user.EmailConfirmed)
         {
             _logger.LogInformation("ActivateAccount: Account already confirmed. UserId: {UserId}", userId);
-            return true; // Ya está activo
+            return true; // Ya est� activo
         }
 
         // Activar cuenta (sin token - Legacy compatibility)
@@ -446,4 +446,161 @@ public class IdentityService : IIdentityService
         var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
         return result.Succeeded;
     }
+
+    // ========================================
+    // M�TODOS ADICIONALES PARA SINCRONIZACI�N IDENTITY + LEGACY
+    // GAP-001, GAP-014, GAP-015
+    // ========================================
+
+    public async Task<bool> LockoutUserAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        
+        if (user == null)
+        {
+            _logger.LogWarning("LockoutUser failed: User not found with ID {UserId}", userId);
+            return false;
+        }
+
+        // Soft delete: Permanent lockout
+        user.LockoutEnabled = true;
+        user.LockoutEnd = DateTimeOffset.MaxValue; // Lock permanently
+
+        var result = await _userManager.UpdateAsync(user);
+
+        if (result.Succeeded)
+        {
+            _logger.LogInformation("User locked out permanently (soft delete). UserId: {UserId}", userId);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Failed to lockout user {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+        }
+
+        return result.Succeeded;
+    }
+
+    public async Task<bool> DeactivateUserAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        
+        if (user == null)
+        {
+            _logger.LogWarning("DeactivateUser failed: User not found with ID {UserId}", userId);
+            return false;
+        }
+
+        // Soft delete: Mark as inactive by:
+        // 1. Disabling email confirmation (prevents login)
+        // 2. Permanent lockout (double security)
+        user.EmailConfirmed = false;
+        user.LockoutEnabled = true;
+        user.LockoutEnd = DateTimeOffset.MaxValue;
+
+        var result = await _userManager.UpdateAsync(user);
+
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning(
+                "Failed to deactivate user {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return false;
+        }
+
+        // Force immediate database commit
+        await _context.SaveChangesAsync();
+        
+        _logger.LogInformation("User deactivated (soft delete). UserId: {UserId}", userId);
+        return true;
+    }
+
+    public async Task<bool> ChangePasswordByIdAsync(string userId, string newPassword)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        
+        if (user == null)
+        {
+            _logger.LogWarning("ChangePasswordById failed: User not found with ID {UserId}", userId);
+            return false;
+        }
+
+        // Remove old password and add new one (administrative change, no validation)
+        await _userManager.RemovePasswordAsync(user);
+        var result = await _userManager.AddPasswordAsync(user, newPassword);
+
+        if (!result.Succeeded)
+        {
+            _logger.LogWarning(
+                "Failed to change password by ID for user {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return false;
+        }
+
+        // CRITICAL: Update security stamp to invalidate old tokens
+        await _userManager.UpdateSecurityStampAsync(user);
+        
+        // CRITICAL: Force SaveChanges to ensure password is immediately usable
+        // Without this, subsequent login attempts may fail with "Invalid password"
+        await _context.SaveChangesAsync();
+        
+        _logger.LogInformation("Password changed by ID (administrative) for user {UserId}", userId);
+        
+        return true;
+    }
+
+    public async Task<bool> UpdateUserEmailAsync(string userId, string newEmail)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        
+        if (user == null)
+        {
+            _logger.LogWarning("UpdateUserEmail failed: User not found with ID {UserId}", userId);
+            return false;
+        }
+
+        // Check if new email is already taken
+        var existingUser = await _userManager.FindByEmailAsync(newEmail);
+        if (existingUser != null && existingUser.Id != userId)
+        {
+            _logger.LogWarning("UpdateUserEmail failed: Email {Email} already in use", newEmail);
+            return false;
+        }
+
+        // Update email (UserName = Email in our system)
+        user.Email = newEmail;
+        user.UserName = newEmail;
+        user.EmailConfirmed = false; // Require re-confirmation for new email
+
+        var result = await _userManager.UpdateAsync(user);
+
+        if (result.Succeeded)
+        {
+            _logger.LogInformation("Email updated for user {UserId} to {NewEmail}", userId, newEmail);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Failed to update email for user {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+        }
+
+        return result.Succeeded;
+    }
+
+    public async Task<(string Email, bool IsActive)?> GetUserByIdAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        
+        if (user == null)
+        {
+            return null;
+        }
+
+        var isActive = user.EmailConfirmed && !await _userManager.IsLockedOutAsync(user);
+
+        return (user.Email!, isActive);
+    }
 }
+

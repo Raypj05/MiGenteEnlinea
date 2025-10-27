@@ -147,6 +147,15 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
     {
         return $"{prefix}_{Guid.NewGuid():N}@test.com";
     }
+    
+    /// <summary>
+    /// Limpia el ChangeTracker de EF Core para forzar queries frescas desde la base de datos.
+    /// Útil cuando el test necesita verificar cambios hechos por HTTP requests.
+    /// </summary>
+    protected void ClearChangeTracker()
+    {
+        DbContext.ChangeTracker.Clear();
+    }
 
     /// <summary>
     /// Limpia la base de datos entre tests (opcional, InMemory se recrea automáticamente)

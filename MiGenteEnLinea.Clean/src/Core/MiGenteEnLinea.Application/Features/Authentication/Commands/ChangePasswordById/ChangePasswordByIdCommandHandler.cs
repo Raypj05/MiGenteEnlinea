@@ -7,49 +7,33 @@ namespace MiGenteEnLinea.Application.Features.Authentication.Commands.ChangePass
 
 /// <summary>
 /// Handler para ChangePasswordByIdCommand
-/// Réplica EXACTA de SuscripcionesService.actualizarPassByID() del Legacy
+/// SINCRONIZA cambios de password en Identity y Legacy Credenciales
 /// GAP-014: Cambia password usando credential ID en lugar de userID
 /// </summary>
 public sealed class ChangePasswordByIdCommandHandler : IRequestHandler<ChangePasswordByIdCommand, bool>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IIdentityService _identityService; // CHANGED: Use IIdentityService abstraction
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<ChangePasswordByIdCommandHandler> _logger;
 
     public ChangePasswordByIdCommandHandler(
         IUnitOfWork unitOfWork,
-        IPasswordHasher passwordHasher,
+        IIdentityService identityService, // CHANGED: Use IIdentityService abstraction
+        IPasswordHasher _passwordHasher,
         ILogger<ChangePasswordByIdCommandHandler> logger)
     {
         _unitOfWork = unitOfWork;
-        _passwordHasher = passwordHasher;
+        _identityService = identityService;
+        this._passwordHasher = _passwordHasher;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Cambia la contraseña de una credencial usando su ID
-    /// 
-    /// Legacy behavior (SuscripcionesService.cs líneas 184-203):
-    /// - Query: db.Credenciales.Where(x => x.id == c.id).FirstOrDefault()
-    /// - Si existe: result.password = c.password (⚠️ ya viene encriptado desde cliente)
-    /// - db.SaveChanges()
-    /// - Retorna true
-    /// 
-    /// ⚠️ DIFERENCIA CON GAP-012 (actualizarCredenciales):
-    /// - GAP-012: Query por userID + email, actualiza email + activo + password
-    /// - GAP-014: Query solo por ID, actualiza SOLO password
-    /// 
-    /// Clean behavior:
-    /// - Query por ID de credencial
-    /// - Hashea password con BCrypt (no confía en cliente)
-    /// - Actualiza solo password
-    /// </summary>
     public async Task<bool> Handle(ChangePasswordByIdCommand request, CancellationToken cancellationToken)
     {
         // ================================================================================
-        // PASO 1: OBTENER CREDENCIAL POR ID
+        // PASO 1: OBTENER CREDENCIAL LEGACY POR ID
         // ================================================================================
-        // Legacy línea 189: db.Credenciales.Where(x => x.id == c.id).FirstOrDefault()
         var credencial = await _unitOfWork.Credenciales.GetByIdAsync(request.CredencialId, cancellationToken);
 
         if (credencial == null)
@@ -63,23 +47,38 @@ public sealed class ChangePasswordByIdCommandHandler : IRequestHandler<ChangePas
         // ================================================================================
         // PASO 2: HASHEAR NUEVA CONTRASEÑA
         // ================================================================================
-        // Legacy línea 191: result.password = c.password (⚠️ ya viene encriptado)
-        // Clean: Hasheamos en servidor (más seguro)
         var passwordHasheado = _passwordHasher.HashPassword(request.NewPassword);
 
         // ================================================================================
-        // PASO 3: ACTUALIZAR PASSWORD
+        // PASO 3: ACTUALIZAR EN IDENTITY (Primary) - Using IIdentityService
+        // ================================================================================
+        var identitySuccess = await _identityService.ChangePasswordByIdAsync(credencial.UserId, request.NewPassword);
+        
+        if (!identitySuccess)
+        {
+            _logger.LogError(
+                "CRITICAL: Failed to update password in Identity. Operation aborted. UserId: {UserId}, CredencialId: {CredencialId}",
+                credencial.UserId,
+                request.CredencialId);
+            
+            // NO continuar si Identity falla - Identity es el sistema primario
+            return false;
+        }
+
+        _logger.LogInformation("Password actualizado en Identity. UserId: {UserId}", credencial.UserId);
+
+        // ================================================================================
+        // PASO 4: ACTUALIZAR EN LEGACY CREDENCIALES (Compatibility)
         // ================================================================================
         credencial.ActualizarPasswordHash(passwordHasheado);
 
         // ================================================================================
-        // PASO 4: GUARDAR CAMBIOS
+        // PASO 5: GUARDAR CAMBIOS EN LEGACY
         // ================================================================================
-        // Legacy línea 193: db.SaveChanges()
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Contraseña actualizada exitosamente por ID. CredencialId: {CredencialId}, UserId: {UserId}",
+            "Contraseña actualizada exitosamente en Identity y Legacy. CredencialId: {CredencialId}, UserId: {UserId}",
             request.CredencialId,
             credencial.UserId);
 

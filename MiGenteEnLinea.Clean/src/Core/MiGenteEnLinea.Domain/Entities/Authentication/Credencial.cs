@@ -138,11 +138,13 @@ public sealed class Credencial : AggregateRoot
     /// <summary>
     /// DOMAIN METHOD: Desactiva la credencial
     /// Se usa cuando se suspende una cuenta o se elimina un usuario
+    /// IDEMPOTENTE: No lanza excepción si ya está desactivada
     /// </summary>
     public void Desactivar()
     {
+        // Idempotente: simplemente asegurar que Activo = false
         if (!Activo)
-            throw new InvalidOperationException("La credencial ya está desactivada");
+            return; // Ya está desactivada, no hacer nada
 
         Activo = false;
     }

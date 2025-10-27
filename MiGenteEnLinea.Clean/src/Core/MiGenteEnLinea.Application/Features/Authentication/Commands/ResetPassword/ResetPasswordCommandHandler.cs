@@ -7,19 +7,23 @@ namespace MiGenteEnLinea.Application.Features.Authentication.Commands.ResetPassw
 
 /// <summary>
 /// Handler para resetear contraseña con token
+/// REFACTORED: Identity-First approach - Identity is primary auth system, Legacy for business logic only
 /// </summary>
 public sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand, bool>
 {
     private readonly IApplicationDbContext _context;
+    private readonly IIdentityService _identityService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
     public ResetPasswordCommandHandler(
         IApplicationDbContext context,
+        IIdentityService identityService,
         IPasswordHasher passwordHasher,
         ILogger<ResetPasswordCommandHandler> logger)
     {
         _context = context;
+        _identityService = identityService;
         _passwordHasher = passwordHasher;
         _logger = logger;
     }
@@ -62,7 +66,27 @@ public sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordC
             return false;
         }
         
-        // Hash nueva contraseña
+        // ================================================================================
+        // STEP 1: Update password in Identity (PRIMARY auth system)
+        // ================================================================================
+        var identitySuccess = await _identityService.ChangePasswordByIdAsync(
+            credencial.UserId, 
+            request.NewPassword);
+
+        if (!identitySuccess)
+        {
+            _logger.LogError(
+                "CRITICAL: Failed to reset password in Identity. Operation aborted. UserId: {UserId}, Email: {Email}",
+                credencial.UserId,
+                request.Email);
+            return false;
+        }
+
+        _logger.LogInformation("Password reset in Identity successfully. UserId: {UserId}", credencial.UserId);
+
+        // ================================================================================
+        // STEP 2: Update password in Legacy Credenciales (BUSINESS LOGIC compatibility)
+        // ================================================================================
         var newPasswordHash = _passwordHasher.HashPassword(request.NewPassword);
         credencial.ActualizarPasswordHash(newPasswordHash);
 
@@ -71,7 +95,11 @@ public sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordC
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("ResetPassword: Contraseña actualizada exitosamente para {Email}", request.Email);
+        _logger.LogInformation(
+            "ResetPassword: Password updated in Identity and Legacy. Email: {Email}, UserId: {UserId}",
+            request.Email, 
+            credencial.UserId);
+        
         return true;
     }
 }

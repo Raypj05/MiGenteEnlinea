@@ -1,8 +1,9 @@
 using MediatR;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MiGenteEnLinea.Application.Common.Interfaces;
+using MiGenteEnLinea.Domain.Interfaces.Repositories;
+using MiGenteEnLinea.Domain.Interfaces.Repositories.Authentication;
 
 namespace MiGenteEnLinea.Application.Features.Authentication.Commands.DeleteUser;
 
@@ -10,20 +11,27 @@ namespace MiGenteEnLinea.Application.Features.Authentication.Commands.DeleteUser
 /// Handler para DeleteUserCommand.
 /// Implementa SOFT DELETE marcando el usuario como inactivo.
 /// SINCRONIZA con Identity y Legacy Credenciales.
+/// FIXED: Use Repository Pattern (same as ActivateAccountCommandHandler) for consistency
 /// </summary>
 public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
 {
-    private readonly IApplicationDbContext _context;
-    private readonly UserManager<IdentityUser> _userManager;
+    private readonly IIdentityService _identityService;
+    private readonly ICredencialRepository _credencialRepository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IApplicationDbContext _context; // ✅ Agregar para acceso directo al ChangeTracker
     private readonly ILogger<DeleteUserCommandHandler> _logger;
 
     public DeleteUserCommandHandler(
-        IApplicationDbContext context,
-        UserManager<IdentityUser> userManager,
+        IIdentityService identityService,
+        ICredencialRepository credencialRepository,
+        IUnitOfWork unitOfWork,
+        IApplicationDbContext context, // ✅ Inyectar DbContext
         ILogger<DeleteUserCommandHandler> logger)
     {
-        _context = context;
-        _userManager = userManager;
+        _identityService = identityService;
+        _credencialRepository = credencialRepository;
+        _unitOfWork = unitOfWork;
+        _context = context; // ✅ Almacenar para acceso al ChangeTracker
         _logger = logger;
     }
 
@@ -31,57 +39,82 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
     {
         try
         {
-            // ================================================================================
-            // 1. DESACTIVAR EN IDENTITY (Primary)
-            // ================================================================================
-            var identityUser = await _userManager.FindByIdAsync(request.UserID);
-            
-            if (identityUser != null)
-            {
-                // Desactivar en Identity
-                identityUser.LockoutEnabled = true;
-                identityUser.LockoutEnd = DateTimeOffset.MaxValue; // Lock permanently
-                
-                var identityResult = await _userManager.UpdateAsync(identityUser);
-                
-                if (!identityResult.Succeeded)
-                {
-                    _logger.LogWarning(
-                        "No se pudo desactivar usuario en Identity. UserID: {UserID}, Errores: {Errors}",
-                        request.UserID,
-                        string.Join(", ", identityResult.Errors.Select(e => e.Description)));
-                }
-                else
-                {
-                    _logger.LogInformation("Usuario desactivado en Identity. UserID: {UserID}", request.UserID);
-                }
-            }
+            _logger.LogInformation("[DELETE-HANDLER] Starting delete. UserID: {UserID}, CredencialID: {CredencialID}", request.UserID, request.CredencialID);
 
             // ================================================================================
-            // 2. DESACTIVAR EN LEGACY CREDENCIALES (Compatibility)
+            // 1. DESACTIVAR EN IDENTITY (PRIMARY auth system)
             // ================================================================================
-            var credencial = await _context.Credenciales
-                .FirstOrDefaultAsync(c => c.UserId == request.UserID && c.Id == request.CredencialID, cancellationToken);
+            var identitySuccess = await _identityService.DeactivateUserAsync(request.UserID);
+            
+            if (!identitySuccess)
+            {
+                _logger.LogError(
+                    "CRITICAL: Failed to deactivate user in Identity. Operation aborted. UserID: {UserID}",
+                    request.UserID);
+                return false;
+            }
+
+            _logger.LogInformation("[DELETE-HANDLER] User deactivated in Identity successfully. UserID: {UserID}", request.UserID);
+
+            // ================================================================================
+            // 2. DESACTIVAR EN LEGACY CREDENCIALES (BUSINESS LOGIC compatibility)
+            // ================================================================================
+            // FIXED: Use Repository Pattern (same as ActivateAccountCommandHandler)
+            _logger.LogInformation("[DELETE-HANDLER] Querying Legacy Credenciales via Repository...");
+            var credencial = await _credencialRepository.GetByUserIdAsync(request.UserID, cancellationToken);
 
             if (credencial == null)
             {
                 _logger.LogWarning(
-                    "Credencial Legacy no encontrada. UserID: {UserID}, CredencialID: {CredencialID}",
-                    request.UserID,
-                    request.CredencialID);
+                    "Legacy Credencial not found. UserID: {UserID}. Identity deactivation successful.",
+                    request.UserID);
 
-                // Si existe en Identity, consideramos exitoso
-                return identityUser != null;
+                // Identity deactivation succeeded, that's sufficient for auth
+                return true;
             }
 
-            // Desactivar en Legacy
+            // ADDITIONAL VALIDATION: Check CredencialID matches (security)
+            if (credencial.Id != request.CredencialID)
+            {
+                _logger.LogError(
+                    "SECURITY: CredencialID mismatch! Expected: {ExpectedId}, Found: {FoundId}. UserID: {UserID}",
+                    request.CredencialID,
+                    credencial.Id,
+                    request.UserID);
+                return false;
+            }
+
+            _logger.LogInformation("[DELETE-HANDLER] BEFORE Desactivar(): Activo={Activo}, UserId={UserId}, CredencialId={CredencialId}", 
+                credencial.Activo, credencial.UserId, credencial.Id);
+
+            // Desactivar en Legacy (for business logic queries)
             credencial.Desactivar();
 
-            // Guardar cambios en Legacy
-            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("[DELETE-HANDLER] AFTER Desactivar(): Activo={Activo}", credencial.Activo);
+
+            // ✅ SOLUCIÓN EF CORE: Marcar explícitamente la propiedad Activo como Modified
+            // IApplicationDbContext es realmente un DbContext, castear para acceso al ChangeTracker
+            var dbContext = _context as DbContext;
+            if (dbContext != null)
+            {
+                var entry = dbContext.Entry(credencial);
+                entry.Property(nameof(credencial.Activo)).IsModified = true;
+                
+                _logger.LogInformation("[DELETE-HANDLER] EF Core Entry State: {State}, Activo IsModified: {IsModified}", 
+                    entry.State, entry.Property(nameof(credencial.Activo)).IsModified);
+            }
+            else
+            {
+                // Fallback: llamar Update() explícitamente
+                _credencialRepository.Update(credencial);
+            }
+
+            // Guardar cambios (EF Core ahora SABE que Activo cambió)
+            var changesSaved = await _unitOfWork.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("[DELETE-HANDLER] SaveChanges completed. Changes saved: {ChangesSaved}", changesSaved);
 
             _logger.LogInformation(
-                "Usuario eliminado (soft delete) exitosamente en Identity y Legacy. UserID: {UserID}, CredencialID: {CredencialID}",
+                "User deleted (soft delete) successfully in Identity and Legacy. UserID: {UserID}, CredencialID: {CredencialID}",
                 request.UserID,
                 request.CredencialID);
 

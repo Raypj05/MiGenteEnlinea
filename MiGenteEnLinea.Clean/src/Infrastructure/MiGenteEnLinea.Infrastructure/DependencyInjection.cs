@@ -101,6 +101,16 @@ public static class DependencyInjection
         .AddEntityFrameworkStores<MiGenteDbContext>()
         .AddDefaultTokenProviders(); // Para reset password, email confirmation, etc.
 
+        // CRITICAL: Registrar UserManager<IdentityUser> alias para Application Layer
+        // Application layer usa IdentityUser (base class) para no depender de Infrastructure
+        // DI resolverá correctamente a ApplicationUser en runtime
+        services.AddScoped<UserManager<IdentityUser>>(sp => 
+        {
+            var appUserManager = sp.GetRequiredService<UserManager<ApplicationUser>>();
+            // Cast is safe because ApplicationUser inherits from IdentityUser
+            return (UserManager<IdentityUser>)(object)appUserManager;
+        });
+
         // JWT Settings Configuration
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         

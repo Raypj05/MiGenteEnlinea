@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ActivateAccount;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.AddProfileInfo;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ChangePasswordById;
@@ -16,6 +17,7 @@ using MiGenteEnLinea.Application.Features.Authentication.Commands.UpdateProfile;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.UpdateProfileExtended;
 using MiGenteEnLinea.Application.Features.Authentication.DTOs;
 using MiGenteEnLinea.Domain.ValueObjects;
+using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
 using MiGenteEnLinea.IntegrationTests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
@@ -474,6 +476,7 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         // Get credencial ID
         var emailVO = Email.CreateUnsafe(email);
         var credencial = await AppDbContext.Credenciales
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Email == emailVO);
         credencial.Should().NotBeNull();
 
@@ -492,8 +495,17 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         result.Should().NotBeNull();
         result!["message"].Should().Contain("eliminado");
 
-        // Verify user is marked inactive
-        var deletedCredencial = await AppDbContext.Credenciales
+        // CRITICAL: Clear EF Core ChangeTracker to force fresh database query
+        // Without this, EF returns cached entity with old Activo=true value
+        ClearChangeTracker();
+
+        // Verify user is marked inactive in Legacy Credenciales
+        // Use separate DbContext to avoid any caching issues
+        using var scope = Factory.Services.CreateScope();
+        var freshContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
+        
+        var deletedCredencial = await freshContext.Credenciales
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Email == emailVO);
         deletedCredencial.Should().NotBeNull();
         deletedCredencial!.Activo.Should().BeFalse();

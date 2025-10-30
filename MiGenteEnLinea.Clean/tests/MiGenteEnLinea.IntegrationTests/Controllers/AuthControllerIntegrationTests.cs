@@ -12,6 +12,7 @@ using MiGenteEnLinea.Application.Features.Authentication.Commands.Register;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.RevokeToken;
 using MiGenteEnLinea.Application.Features.Authentication.DTOs;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
+using MiGenteEnLinea.Domain.ValueObjects; // Email VO for equality queries
 using MiGenteEnLinea.IntegrationTests.Infrastructure;
 using Xunit;
 
@@ -93,11 +94,11 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var freshContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
         
-        // ✅ Use ToListAsync first then filter in memory to avoid EF translation issues with value objects
-        var allCredenciales = await freshContext.CredencialesRefactored.AsNoTracking().ToListAsync();
-        var credencial = allCredenciales.FirstOrDefault(c => c.Email.Value == email);
-        credencial.Should().NotBeNull();
-        
+        // EF Core ValueObject Email se mapea via HasConversion; para que se traduzca usar igualdad directa contra VO
+        var emailVO = Email.CreateUnsafe(email);
+        var credencial = await freshContext.CredencialesRefactored
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Email == emailVO);
         var contratista = await freshContext.Contratistas
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.UserId == credencial!.UserId);
@@ -233,9 +234,10 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var freshContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
         
-        // ✅ Use ToListAsync first then filter in memory to avoid EF translation issues
-        var allCredenciales = await freshContext.CredencialesRefactored.AsNoTracking().ToListAsync();
-        var credencial = allCredenciales.First(c => c.Email.Value == email);
+        var emailVO = Email.CreateUnsafe(email);
+        var credencial = await freshContext.CredencialesRefactored
+            .AsNoTracking()
+            .FirstAsync(c => c.Email == emailVO);
         credencial.Activo.Should().BeFalse();
 
         var activateCommand = new ActivateAccountCommand
@@ -280,9 +282,10 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var freshContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
         
-        // ✅ Use ToListAsync first then filter in memory to avoid EF translation issues
-        var allCredenciales = await freshContext.CredencialesRefactored.AsNoTracking().ToListAsync();
-        var credencial = allCredenciales.First(c => c.Email.Value == "juan.perez@test.com");
+        var emailVO = Email.CreateUnsafe("juan.perez@test.com");
+        var credencial = await freshContext.CredencialesRefactored
+            .AsNoTracking()
+            .FirstAsync(c => c.Email == emailVO);
 
         var changePasswordCommand = new ChangePasswordCommand(
             Email: "juan.perez@test.com",

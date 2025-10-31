@@ -46,15 +46,20 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
     /// </summary>
     private async Task SeedTestData()
     {
+        // ⚠️ DESHABILITADO: Cada test debe crear sus propios usuarios con Identity
+        // Esto asegura que el password hashing sea consistente
+        
         // Verificar si ya hay datos (para evitar duplicados entre tests)
-        var hasData = await AppDbContext.Credenciales.AnyAsync();
-        if (hasData)
-        {
-            return; // Ya hay datos seeded
-        }
+        //var hasData = await AppDbContext.Credenciales.AnyAsync();
+        //if (hasData)
+        //{
+        //    return; // Ya hay datos seeded
+        //}
         
         // Ejecutar seeder
-        await TestDataSeeder.SeedAllAsync(AppDbContext);
+        //await TestDataSeeder.SeedAllAsync(AppDbContext);
+        
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -89,8 +94,19 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         var response = await Client.PostAsJsonAsync("/api/auth/login", loginRequest);
         response.EnsureSuccessStatusCode();
 
+        // ✅ La API devuelve camelCase por JsonNamingPolicy
         var loginResponse = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginResponse.GetProperty("accessToken").GetString();
+        
+        // Intentar ambas versiones para compatibilidad
+        string? token = null;
+        if (loginResponse.TryGetProperty("accessToken", out var accessTokenProperty))
+        {
+            token = accessTokenProperty.GetString();
+        }
+        else if (loginResponse.TryGetProperty("AccessToken", out var accessTokenPropertyPascal))
+        {
+            token = accessTokenPropertyPascal.GetString();
+        }
         
         token.Should().NotBeNullOrEmpty("El login debe devolver un access token");
         
@@ -100,21 +116,30 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
 
     /// <summary>
     /// Helper para registrar un usuario de prueba
+    /// ✅ SIGNATURE: RegisterUserAsync(email, password, tipo, nombre, apellido)
+    /// ⚠️ Genera email único automáticamente para evitar conflictos
+    /// 📧 RETORNA: (userId, emailUsado) - el email puede ser diferente al proporcionado
+    /// ✅ ACTIVA la cuenta automáticamente para permitir login inmediato
     /// </summary>
-    protected async Task<int> RegisterUserAsync(
+    protected async Task<(string UserId, string Email)> RegisterUserAsync(
         string email, 
-        string password, 
+        string password,
+        string tipo, // "Empleador" o "Contratista"  
         string nombre, 
         string apellido,
-        string tipo = "Empleador", // o "Contratista"
         string? identificacion = null)
     {
+        // ✅ FIX: Generar email único para evitar conflictos de emails duplicados en DB
+        var uniqueSuffix = Guid.NewGuid().ToString("N").Substring(0, 8);
+        var emailParts = email.Split('@');
+        var emailUnico = $"{emailParts[0]}+{uniqueSuffix}@{emailParts[1]}";
+        
         // ✅ FIX: RegisterCommand expects Tipo as int (1=Empleador, 2=Contratista) and Host property
         int tipoInt = tipo.Equals("Contratista", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
         
         var registerRequest = new
         {
-            email,
+            email = emailUnico,
             password,
             nombre,
             apellido,
@@ -127,11 +152,29 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         response.EnsureSuccessStatusCode();
 
         var registerResponse = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var userId = registerResponse.GetProperty("userId").GetInt32();
         
-        userId.Should().BeGreaterThan(0, "El registro debe devolver un userId válido");
+        // ✅ FIX: RegisterResult retorna DOS IDs:
+        // - "userId" (int) = Credencial.Id (Legacy)
+        // - "identityUserId" (string GUID) = Identity UserId (PRIMARY KEY)
+        // Los tests necesitan el identityUserId para autenticación
+        string? userId = null;
+        if (registerResponse.TryGetProperty("identityUserId", out var identityUserIdProperty))
+        {
+            userId = identityUserIdProperty.GetString();
+        }
+        else if (registerResponse.TryGetProperty("IdentityUserId", out var identityUserIdPropertyPascal))
+        {
+            userId = identityUserIdPropertyPascal.GetString();
+        }
         
-        return userId;
+        userId.Should().NotBeNullOrEmpty("El registro debe devolver un identityUserId válido");
+        
+        // ✅ FIX: Activar la cuenta automáticamente para permitir login inmediato en tests
+        var activateRequest = new { userId, email = emailUnico };
+        var activateResponse = await Client.PostAsJsonAsync("/api/auth/activate", activateRequest);
+        activateResponse.EnsureSuccessStatusCode();
+        
+        return (userId!, emailUnico);
     }
 
     /// <summary>

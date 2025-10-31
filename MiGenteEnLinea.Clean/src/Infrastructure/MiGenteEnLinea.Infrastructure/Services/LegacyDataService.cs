@@ -46,11 +46,15 @@ public class LegacyDataService : ILegacyDataService
         int remuneracionId,
         CancellationToken cancellationToken = default)
     {
-        // Legacy: db.Remuneraciones.Remove(toDelete); db.SaveChanges();
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM Remuneraciones WHERE userID = {0} AND id = {1}",
-            [userId, remuneracionId],
-            cancellationToken);
+        // ✅ EF Core: Query + Remove + SaveChanges
+        var remuneracion = await _context.Set<Remuneracione>()
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.Id == remuneracionId, cancellationToken);
+
+        if (remuneracion != null)
+        {
+            _context.Set<Remuneracione>().Remove(remuneracion);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task CreateRemuneracionesAsync(
@@ -59,34 +63,19 @@ public class LegacyDataService : ILegacyDataService
         List<RemuneracionItemDto> remuneraciones,
         CancellationToken cancellationToken = default)
     {
-        // Legacy: db.Remuneraciones.AddRange(rem); db.SaveChanges();
-        // Construir INSERT batch usando StringBuilder
-        var sqlBuilder = new StringBuilder();
-        var parameters = new List<object>();
-        int paramIndex = 0;
-
-        foreach (var rem in remuneraciones)
+        // ✅ EF Core: AddRange + SaveChanges (batch insert)
+        var entidades = remuneraciones.Select(rem => new Remuneracione
         {
-            if (sqlBuilder.Length > 0)
-                sqlBuilder.Append(";");
+            UserId = userId,
+            EmpleadoId = empleadoId,
+            Descripcion = rem.Descripcion,
+            Monto = rem.Monto
+        }).ToList();
 
-            sqlBuilder.Append($"INSERT INTO Remuneraciones (userID, empleadoID, descripcion, monto) " +
-                            $"VALUES ({{{paramIndex}}}, {{{paramIndex + 1}}}, {{{paramIndex + 2}}}, {{{paramIndex + 3}}})");
-
-            parameters.Add(userId);
-            parameters.Add(empleadoId);
-            parameters.Add(rem.Descripcion);
-            parameters.Add(rem.Monto);
-
-            paramIndex += 4;
-        }
-
-        if (sqlBuilder.Length > 0)
+        if (entidades.Any())
         {
-            await _context.Database.ExecuteSqlRawAsync(
-                sqlBuilder.ToString(),
-                parameters.ToArray(),
-                cancellationToken);
+            await _context.Set<Remuneracione>().AddRangeAsync(entidades, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 
@@ -96,15 +85,34 @@ public class LegacyDataService : ILegacyDataService
         List<RemuneracionItemDto> remuneraciones,
         CancellationToken cancellationToken = default)
     {
-        // Legacy: DELETE existing, then INSERT new
-        // Step 1: Delete existing remuneraciones for this empleadoId
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM Remuneraciones WHERE userID = {0} AND empleadoID = {1}",
-            [userId, empleadoId],
-            cancellationToken);
+        // ✅ EF Core: Query existing, RemoveRange, AddRange, SaveChanges (single transaction)
+        // Step 1: Get existing remuneraciones for this empleadoId
+        var existingRemuneraciones = await _context.Set<Remuneracione>()
+            .Where(r => r.UserId == userId && r.EmpleadoId == empleadoId)
+            .ToListAsync(cancellationToken);
 
-        // Step 2: Insert new remuneraciones
-        await CreateRemuneracionesAsync(userId, empleadoId, remuneraciones, cancellationToken);
+        // Step 2: Remove existing
+        if (existingRemuneraciones.Any())
+        {
+            _context.Set<Remuneracione>().RemoveRange(existingRemuneraciones);
+        }
+
+        // Step 3: Add new remuneraciones
+        var nuevasEntidades = remuneraciones.Select(rem => new Remuneracione
+        {
+            UserId = userId,
+            EmpleadoId = empleadoId,
+            Descripcion = rem.Descripcion,
+            Monto = rem.Monto
+        }).ToList();
+
+        if (nuevasEntidades.Any())
+        {
+            await _context.Set<Remuneracione>().AddRangeAsync(nuevasEntidades, cancellationToken);
+        }
+
+        // Step 4: Save all changes in single transaction
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<List<DeduccionTssDto>> GetDeduccionesTssAsync(CancellationToken cancellationToken = default)
@@ -125,18 +133,20 @@ public class LegacyDataService : ILegacyDataService
         string motivo,
         CancellationToken cancellationToken = default)
     {
-        // Legacy: 
-        // empleado.Activo = false;
-        // empleado.fechaSalida = fechaBaja.Date;
-        // empleado.motivoBaja = motivo;
-        // empleado.prestaciones = prestaciones;
-        // db.SaveChanges();
+        // ✅ EF Core: Query + Update properties + SaveChanges
+        var empleado = await _context.Set<Empleado>()
+            .FirstOrDefaultAsync(e => e.EmpleadoId == empleadoId && e.UserId == userId, cancellationToken);
 
-        await _context.Database.ExecuteSqlRawAsync(
-            "UPDATE Empleados SET Activo = 0, fechaSalida = {0}, motivoBaja = {1}, prestaciones = {2} " +
-            "WHERE empleadoID = {3} AND userID = {4}",
-            [fechaBaja.Date, motivo, prestaciones, empleadoId, userId],
-            cancellationToken);
+        if (empleado == null)
+            return false;
+
+        // Update properties (soft delete)
+        empleado.Activo = false;
+        empleado.FechaSalida = fechaBaja.Date; // DateTime? property
+        empleado.MotivoBaja = motivo;
+        empleado.Prestaciones = prestaciones;
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         return true;
     }
@@ -146,15 +156,16 @@ public class LegacyDataService : ILegacyDataService
         int detalleId,
         CancellationToken cancellationToken = default)
     {
-        // Legacy:
-        // detalle.estatus = 3;
-        // db.SaveChanges();
+        // ✅ EF Core: Query + Update single property + SaveChanges
+        var detalle = await _context.Set<DetalleContratacione>()
+            .FirstOrDefaultAsync(d => d.ContratacionId == contratacionId && d.DetalleId == detalleId, cancellationToken);
 
-        await _context.Database.ExecuteSqlRawAsync(
-            "UPDATE DetalleContrataciones SET estatus = 3 " +
-            "WHERE contratacionID = {0} AND detalleID = {1}",
-            [contratacionId, detalleId],
-            cancellationToken);
+        if (detalle == null)
+            return false;
+
+        detalle.Estatus = 3; // Cancelled status
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         return true;
     }
@@ -163,18 +174,16 @@ public class LegacyDataService : ILegacyDataService
         int pagoId,
         CancellationToken cancellationToken = default)
     {
-        // Legacy uses 2 separate DbContexts - we'll use 2 separate SQL commands
-        // Step 1: Delete details
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM Empleador_Recibos_Detalle WHERE pagoID = {0}",
-            [pagoId],
-            cancellationToken);
+        // ✅ EF Core: Include Detalle + Remove Header (cascade delete automatic if configured)
+        var header = await _context.Set<EmpleadorRecibosHeader>()
+            .Include(h => h.EmpleadorRecibosDetalles)
+            .FirstOrDefaultAsync(h => h.PagoId == pagoId, cancellationToken);
 
-        // Step 2: Delete header
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM Empleador_Recibos_Header WHERE pagoID = {0}",
-            [pagoId],
-            cancellationToken);
+        if (header == null)
+            return false;
+
+        _context.Set<EmpleadorRecibosHeader>().Remove(header);
+        await _context.SaveChangesAsync(cancellationToken);
 
         return true;
     }
@@ -183,18 +192,16 @@ public class LegacyDataService : ILegacyDataService
         int pagoId,
         CancellationToken cancellationToken = default)
     {
-        // Legacy uses 2 separate DbContexts - same pattern for contrataciones
-        // Step 1: Delete details
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM Empleador_Recibos_Detalle_Contrataciones WHERE pagoID = {0}",
-            [pagoId],
-            cancellationToken);
+        // ✅ EF Core: Include Detalle + Remove Header (cascade delete automatic if configured)
+        var header = await _context.Set<EmpleadorRecibosHeaderContratacione>()
+            .Include(h => h.EmpleadorRecibosDetalleContrataciones)
+            .FirstOrDefaultAsync(h => h.PagoId == pagoId, cancellationToken);
 
-        // Step 2: Delete header
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM Empleador_Recibos_Header_Contrataciones WHERE pagoID = {0}",
-            [pagoId],
-            cancellationToken);
+        if (header == null)
+            return false;
+
+        _context.Set<EmpleadorRecibosHeaderContratacione>().Remove(header);
+        await _context.SaveChangesAsync(cancellationToken);
 
         return true;
     }
@@ -261,39 +268,30 @@ public class LegacyDataService : ILegacyDataService
         int contratacionId,
         CancellationToken cancellationToken = default)
     {
-        // Legacy: Complex cascade delete using multiple DbContexts
-        // 1. Get EmpleadoTemporal with receipts
-        // 2. For each receipt: delete Detalle → Header
-        // 3. Delete EmpleadoTemporal
+        // ✅ EF Core OPTIMIZED: Load all entities in one query with Include().ThenInclude()
+        // Then remove in correct order (Detalles → Headers → EmpleadoTemporal)
+        // Single SaveChanges = atomic transaction
 
-        // Step 1: Get all receipt IDs for this empleadoTemporal
-        var reciboIds = await _context
-            .Set<EmpleadorRecibosHeaderContratacione>()
-            .Where(r => r.ContratacionId == contratacionId)
-            .Select(r => r.PagoId)
-            .ToListAsync(cancellationToken);
+        var empleadoTemporal = await _context.Set<EmpleadosTemporale>()
+            .Include(et => et.EmpleadorRecibosHeaderContrataciones)
+                .ThenInclude(h => h.EmpleadorRecibosDetalleContrataciones)
+            .FirstOrDefaultAsync(et => et.ContratacionId == contratacionId, cancellationToken);
 
-        // Step 2: For each receipt, delete Detalle → Header
-        foreach (var pagoId in reciboIds)
+        if (empleadoTemporal == null)
+            return false;
+
+        // Remove all receipts (headers will cascade delete detalles if configured, otherwise explicit)
+        if (empleadoTemporal.EmpleadorRecibosHeaderContrataciones?.Any() == true)
         {
-            // Delete details first
-            await _context.Database.ExecuteSqlRawAsync(
-                "DELETE FROM Empleador_Recibos_Detalle_Contrataciones WHERE pagoID = {0}",
-                [pagoId],
-                cancellationToken);
-
-            // Then delete header
-            await _context.Database.ExecuteSqlRawAsync(
-                "DELETE FROM Empleador_Recibos_Header_Contrataciones WHERE pagoID = {0}",
-                [pagoId],
-                cancellationToken);
+            _context.Set<EmpleadorRecibosHeaderContratacione>()
+                .RemoveRange(empleadoTemporal.EmpleadorRecibosHeaderContrataciones);
         }
 
-        // Step 3: Delete EmpleadoTemporal
-        await _context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM EmpleadosTemporales WHERE contratacionID = {0}",
-            [contratacionId],
-            cancellationToken);
+        // Remove empleadoTemporal
+        _context.Set<EmpleadosTemporale>().Remove(empleadoTemporal);
+
+        // Single atomic transaction
+        await _context.SaveChangesAsync(cancellationToken);
 
         return true;
     }

@@ -64,19 +64,27 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         result.Should().NotBeNull();
         result!.Success.Should().BeTrue();
 
+        // Get UserId (GUID) from Credencial using CredentialId
+        var credencial = await AppDbContext.Credenciales
+            .FirstOrDefaultAsync(c => c.Id == result.CredentialId!.Value);
+        
+        if (credencial == null)
+            throw new InvalidOperationException($"Credencial not found for ID {result.CredentialId}");
+
         if (isActive)
         {
-            // Activate the account
+            // Activate the account with correct UserId (GUID)
             var activateCommand = new ActivateAccountCommand
             {
-                UserId = result.UserId!,
+                UserId = credencial.UserId, // ✅ GUID string, not CredentialId
                 Email = email
             };
             var activateResponse = await Client.PostAsJsonAsync("/api/auth/activate", activateCommand);
             activateResponse.EnsureSuccessStatusCode();
         }
 
-        return (result.UserId!, email);
+        // Return UserId (GUID) for commands that need it
+        return (credencial.UserId, email);
     }
 
     private async Task<string> GetAuthTokenAsync(string email, string password)
@@ -124,9 +132,10 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         result.Should().NotBeNull();
         result!["message"].Should().Contain("activada exitosamente");
 
-        // Verify in database
+        // Verify in database - Use AsNoTracking to bypass EF cache and get fresh data
         var emailVO = Email.CreateUnsafe(email);
         var credencial = await AppDbContext.Credenciales
+            .AsNoTracking() // ✅ Bypass cache to get actual DB state
             .FirstOrDefaultAsync(c => c.Email == emailVO);
 
         credencial.Should().NotBeNull();

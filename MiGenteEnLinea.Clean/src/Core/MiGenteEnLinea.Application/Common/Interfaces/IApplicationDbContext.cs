@@ -15,7 +15,7 @@ namespace MiGenteEnLinea.Application.Common.Interfaces;
 public interface IApplicationDbContext
 {
     // Entidades de dominio (Write Models)
-    DbSet<Domain.Entities.Authentication.Credencial> coCredenciales { get; }
+    DbSet<Domain.Entities.Authentication.Credencial> Credenciales { get; }
     DbSet<Domain.Entities.Authentication.PasswordResetToken> PasswordResetTokens { get; }
     DbSet<Domain.Entities.Suscripciones.Suscripcion> Suscripciones { get; }
     DbSet<Domain.Entities.Suscripciones.PlanEmpleador> PlanesEmpleadores { get; }

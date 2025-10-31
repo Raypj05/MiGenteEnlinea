@@ -15,8 +15,12 @@ namespace MiGenteEnLinea.Domain.Entities.Empleadores;
 /// - Un userId (Credencial) puede ser empleador O contratista (relación 1:1)
 /// - Los empleadores publican ofertas laborales y gestionan nómina
 /// - Habilidades y experiencia son campos descriptivos del negocio/empresa
+/// 
+/// SOFT DELETE:
+/// - Hereda de SoftDeletableEntity para eliminación lógica (Oct 2025)
+/// - Método Delete(userId) marca como eliminado sin borrado físico
 /// </summary>
-public sealed class Empleador : AggregateRoot
+public sealed class Empleador : SoftDeletableEntity
 {
     /// <summary>
     /// Identificador único del empleador

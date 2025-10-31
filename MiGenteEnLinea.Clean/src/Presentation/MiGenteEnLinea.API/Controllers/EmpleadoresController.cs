@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MiGenteEnLinea.Application.Features.Empleadores.Commands.CreateEmpleador;
 using MiGenteEnLinea.Application.Features.Empleadores.Commands.UpdateEmpleador;
@@ -15,6 +16,7 @@ namespace MiGenteEnLinea.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 [Produces("application/json")]
 public class EmpleadoresController : ControllerBase
 {

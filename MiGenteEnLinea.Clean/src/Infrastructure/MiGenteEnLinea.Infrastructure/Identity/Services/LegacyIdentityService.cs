@@ -261,7 +261,7 @@ public class LegacyIdentityService : IIdentityService
         throw new NotImplementedException("Use IdentityService for Identity operations");
     }
 
-    public async Task<bool> UpdateUserEmailAsync(string userId, string newEmail)
+    public async Task<bool> UpdateUserEmailAsync(string userId, string newEmail, bool autoSave = true)
     {
         _logger.LogWarning("UpdateUserEmailAsync called on LegacyIdentityService - use IdentityService instead");
         throw new NotImplementedException("Use IdentityService for Identity operations");

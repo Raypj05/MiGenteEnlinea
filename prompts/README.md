@@ -13,7 +13,9 @@ prompts/
 ├── COMPLETE_ENTITY_MIGRATION_PLAN.md           # 🎯 Plan Maestro - 36 Entidades (COMPLETADO 100%)
 ├── DATABASE_RELATIONSHIPS_VALIDATION.md        # ⚠️ CRÍTICO: FK relationships (COMPLETADO 100%)
 ├── PROGRAM_CS_AND_DI_CONFIGURATION.md          # ⚙️ Program.cs y DI (COMPLETADO 100%)
-├── APPLICATION_LAYER_CQRS_IMPLEMENTATION.md    # 🚀 Application Layer CQRS (NUEVO - EN PROGRESO)
+├── APPLICATION_LAYER_CQRS_IMPLEMENTATION.md    # 🚀 Application Layer CQRS (COMPLETADO 100%)
+├── TESTING_STRATEGY_CONTROLLER_BY_CONTROLLER.md # 🧪 Testing Strategy Master (NUEVO)
+├── PROMPT_EMPLEADORES_CONTROLLER_TESTING.md    # 🎯 Empleadores Testing (NUEVO)
 ├── DDD_MIGRATION_PROMPT.md                     # 📚 Guía completa de patrones DDD
 ├── COPILOT_INSTRUCTIONS.md                     # 📝 Instrucciones específicas de Copilot
 ├── GITHUB_CONFIG_PROMPT.md                     # ⚙️ Setup de CI/CD
@@ -233,6 +235,86 @@ TAREA: Genera reporte de progreso actual
 - Próximo LOTE a ejecutar
 - Estimación de tiempo restante
 ```
+
+---
+
+### Workflow 5: 🧪 Testing Controller-by-Controller (NUEVO)
+
+**Agente:** Claude Sonnet 4.5 (Modo Agente)  
+**Prompts:** 
+- `TESTING_STRATEGY_CONTROLLER_BY_CONTROLLER.md` (Estrategia Master)
+- `PROMPT_EMPLEADORES_CONTROLLER_TESTING.md` (EmpleadoresController específico)
+
+**Estado:** 🔄 **EN PROGRESO - EmpleadoresController activo**
+
+**Prerequisito:** Backend 100% completado ✅ (123 endpoints REST)
+
+**Objetivo:**  
+Testing exhaustivo **controller por controller**, validando TODOS los Commands/Queries/Endpoints con lógica de negocio real de Legacy.
+
+**🎯 Testing Order:**
+1. ✅ **AuthController** - COMPLETADO (39/39 tests, 100%)
+2. 🔄 **EmpleadoresController** - EN PROGRESO (2/8 tests, 25%)
+3. ⏳ **ContratistasController** - Pendiente (0/6 tests)
+4. ⏳ **EmpleadosController** - Pendiente (0/11 tests)
+5. ⏳ **SuscripcionesController** - Pendiente (0/8 tests)
+6. ⏳ **ContratacionesController** - Pendiente (estimado 10+ tests)
+7. ⏳ **NominasController** - Pendiente (estimado 8+ tests)
+8. ⏳ **BusinessLogicTests** - ÚLTIMO (11 end-to-end flows)
+
+**Comando de ejecución (EmpleadoresController):**
+```
+@workspace Lee prompts/TESTING_STRATEGY_CONTROLLER_BY_CONTROLLER.md COMPLETO
+
+Luego lee prompts/PROMPT_EMPLEADORES_CONTROLLER_TESTING.md COMPLETO
+
+EJECUTAR: EmpleadoresController Deep Testing
+
+OBJETIVO: Testing exhaustivo de TODOS los Commands/Queries/Endpoints
+
+METODOLOGÍA:
+1. ANALIZAR Legacy: Leer archivos en "Codigo Fuente Mi Gente/MiGente_Front/Empleador/*.aspx.cs"
+2. IDENTIFICAR: Business rules del Legacy (RNC, validaciones, autorizaciones)
+3. IMPLEMENTAR: Tests siguiendo templates en prompt
+   - Command tests (happy path + validation + authorization)
+   - Query tests (valid + invalid + not found)
+   - Business logic tests (RNC unique, plan limits, etc.)
+4. EJECUTAR: dotnet test y validar resultados
+5. DEBUGGEAR: Si tests fallan, fix APLICACIÓN (no tests)
+6. REPORTAR: Resultados en formato especificado
+
+AUTORIZACIÓN COMPLETA:
+- Leer TODOS los archivos Legacy necesarios
+- Crear/modificar tests en EmpleadoresControllerTests.cs
+- Ejecutar dotnet test repetidamente
+- Modificar Application/Commands o API/Controllers si hay bugs
+- Verificar con DbContext (queries directas a DB)
+
+DURACIÓN ESTIMADA: 4-6 horas
+
+CRITERIO DE ÉXITO:
+- Mínimo 20/28 tests pasando (70%+)
+- Todos los Commands testeados (5 commands)
+- Todas las Queries testeadas (4 queries)
+- Business rules críticas validadas
+- Reporte detallado de resultados
+
+NO PARAR hasta alcanzar criterio de éxito.
+
+COMENZAR EJECUCIÓN AUTOMÁTICA AHORA.
+```
+
+**Resultado esperado:**
+- ✅ 20-28 tests implementados para EmpleadoresController
+- ✅ 70%+ tests passing (mínimo)
+- ✅ Todos los Commands testeados (CreateEmpleador, UpdateEmpleador, DeleteEmpleador, etc.)
+- ✅ Todas las Queries testeadas (GetById, GetByUserId, Search, etc.)
+- ✅ Business rules validadas (RNC uniqueness, authorization, soft delete)
+- ✅ Application bugs discovered y documentados
+- ✅ Reporte en formato: "EmpleadoresController Testing - COMPLETE"
+
+**Próximo controller:**
+Después de EmpleadoresController → **ContratistasController** (usar prompt similar)
 
 ---
 

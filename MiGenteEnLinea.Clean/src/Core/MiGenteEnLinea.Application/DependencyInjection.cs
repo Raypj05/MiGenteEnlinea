@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using MiGenteEnLinea.Application.Common.Behaviors;
 using MiGenteEnLinea.Application.Features.Dashboard.Services;
 
 namespace MiGenteEnLinea.Application;
@@ -19,8 +20,10 @@ public static class DependencyInjection
         {
             config.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
 
-            // TODO: Agregar behaviors cuando se implementen
-            // config.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            // Validation behavior - ejecuta FluentValidation automáticamente
+            config.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            
+            // TODO: Agregar behaviors adicionales cuando se implementen
             // config.AddOpenBehavior(typeof(LoggingBehavior<,>));
             // config.AddOpenBehavior(typeof(PerformanceBehavior<,>));
         });

@@ -553,6 +553,14 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
         //     entity.ToView("VSuscripciones");
         // });
 
+        // ============================================
+        // GLOBAL QUERY FILTERS (Soft Delete)
+        // Agregado: Oct 2025
+        // ============================================
+        // Empleador: Excluir eliminados lógicamente
+        modelBuilder.Entity<Empleador>()
+            .HasQueryFilter(e => !e.IsDeleted);
+
         OnModelCreatingPartial(modelBuilder);
     }
 

@@ -17,9 +17,9 @@ public class CreateEmpleadoCommandValidator : AbstractValidator<CreateEmpleadoCo
 
         RuleFor(x => x.Identificacion)
             .NotEmpty().WithMessage("Identificación es requerida")
-            .MaximumLength(20)
-            .Matches(@"^[0-9]{11}$|^[0-9]{9}$")
-            .WithMessage("Identificación debe ser cédula (11 dígitos) o pasaporte (9 dígitos)");
+            .Length(11).WithMessage("La cédula debe tener 11 dígitos")
+            .Matches(@"^[0-9]{11}$")
+            .WithMessage("La cédula debe contener solo números");
 
         RuleFor(x => x.Nombre)
             .NotEmpty().WithMessage("Nombre es requerido")

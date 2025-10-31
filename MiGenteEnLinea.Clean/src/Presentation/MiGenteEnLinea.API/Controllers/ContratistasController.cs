@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MiGenteEnLinea.Application.Features.Contratistas.Commands.ActivarPerfil;
 using MiGenteEnLinea.Application.Features.Contratistas.Commands.AddServicio;
@@ -24,6 +25,7 @@ namespace MiGenteEnLinea.API.Controllers;
 /// </remarks>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ContratistasController : ControllerBase
 {
     private readonly IMediator _mediator;

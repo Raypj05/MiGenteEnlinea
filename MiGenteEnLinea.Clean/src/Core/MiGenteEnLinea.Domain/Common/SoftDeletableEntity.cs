@@ -3,8 +3,9 @@ namespace MiGenteEnLinea.Domain.Common;
 /// <summary>
 /// Entidad base para soft delete (eliminación lógica).
 /// Los registros no se eliminan físicamente, solo se marcan como eliminados.
+/// NOTA: Hereda de AggregateRoot para soportar domain events (Oct 2025)
 /// </summary>
-public abstract class SoftDeletableEntity : AuditableEntity
+public abstract class SoftDeletableEntity : AggregateRoot
 {
     /// <summary>
     /// Indica si la entidad fue eliminada lógicamente

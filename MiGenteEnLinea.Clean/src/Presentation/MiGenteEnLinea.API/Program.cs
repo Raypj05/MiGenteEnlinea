@@ -204,18 +204,8 @@ var app = builder.Build();
 // Serilog Request Logging
 app.UseSerilogRequestLogging();
 
-// Exception Handling
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-}
-else
-{
-    // TODO: Implementar GlobalExceptionHandlerMiddleware para producción
-    // app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
-    app.UseExceptionHandler("/error");
-    app.UseHsts();
-}
+// Global Exception Handling - DEBE IR ANTES de otros middlewares
+app.UseMiddleware<MiGenteEnLinea.API.Middleware.GlobalExceptionHandlerMiddleware>();
 
 // Swagger (solo en desarrollo)
 if (app.Environment.IsDevelopment())

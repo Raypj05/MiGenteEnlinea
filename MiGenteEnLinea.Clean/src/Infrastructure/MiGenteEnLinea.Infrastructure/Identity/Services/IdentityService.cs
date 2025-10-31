@@ -37,17 +37,21 @@ public class IdentityService : IIdentityService
         // 4. Return unified result
         // ============================================================
 
+        _logger.LogInformation("🔍 DEBUG: LoginAsync called with email: {Email}", email);
+
         // Step 1: Try Identity login first (modern system)
         var user = await _userManager.FindByEmailAsync(email);
         
         if (user != null)
         {
+            _logger.LogInformation("🔍 DEBUG: User found in Identity - UserId: {UserId}, Email: {Email}, NormalizedEmail: {NormalizedEmail}", 
+                user.Id, user.Email, user.NormalizedEmail);
             // User exists in Identity - standard login flow
             return await LoginWithIdentityAsync(user, password, ipAddress);
         }
 
         // Step 2: User not in Identity, check legacy tables
-        _logger.LogInformation("User not found in Identity, checking legacy tables for email: {Email}", email);
+        _logger.LogWarning("🔍 DEBUG: User NOT found in Identity with FindByEmailAsync({Email}), checking legacy tables", email);
         
         // Query legacy Credenciales table (domain entity)
         // NOTA: No usar .Email.Value en LINQ - EF Core no puede traducir Value Objects
@@ -61,13 +65,55 @@ public class IdentityService : IIdentityService
             throw new UnauthorizedAccessException("Credenciales inv�lidas");
         }
 
-        // Step 3: Validate password against legacy hash (BCrypt)
-        var passwordValid = BCrypt.Net.BCrypt.Verify(password, credencial.PasswordHash);
+        _logger.LogInformation("🔍 DEBUG: User found in Legacy - UserId: {UserId}, Email: {Email}, attempting migration to Identity", 
+            credencial.UserId, credencial.Email.Value);
+
+        // Step 3: Validate password against legacy hash
+        // ✅ IMPORTANTE: El hash en Credenciales puede ser BCrypt (legacy) o Identity PasswordHasher (nuevo)
+        // Intentamos verificar con Identity PasswordHasher primero (más común después de migraciones)
+        // Si falla, intentamos con BCrypt para backward compatibility
+        bool passwordValid = false;
+        
+        try
+        {
+            // Crear un ApplicationUser temporal para verificar el password
+            var tempUser = new ApplicationUser { UserName = credencial.Email.Value, PasswordHash = credencial.PasswordHash };
+            var identityResult = _userManager.PasswordHasher.VerifyHashedPassword(tempUser, credencial.PasswordHash, password);
+            
+            if (identityResult == PasswordVerificationResult.Success || identityResult == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                passwordValid = true;
+                _logger.LogInformation("Password verified using Identity PasswordHasher for user {UserId}", credencial.UserId);
+            }
+        }
+        catch (FormatException ex)
+        {
+            // Hash is not in Identity format (probably BCrypt) - will try BCrypt next
+            _logger.LogDebug("Hash format not compatible with Identity PasswordHasher for user {UserId}: {Error}", credencial.UserId, ex.Message);
+        }
+        
+        // Fallback: Try BCrypt for old legacy hashes if Identity verification didn't succeed
+        if (!passwordValid)
+        {
+            try
+            {
+                passwordValid = BCrypt.Net.BCrypt.Verify(password, credencial.PasswordHash);
+                if (passwordValid)
+                {
+                    _logger.LogInformation("Password verified using BCrypt (legacy) for user {UserId}", credencial.UserId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("BCrypt verification failed for user {UserId}: {Error}", credencial.UserId, ex.Message);
+                passwordValid = false;
+            }
+        }
         
         if (!passwordValid)
         {
             _logger.LogWarning("Login failed: Invalid password for legacy user {UserId}", credencial.UserId);
-            throw new UnauthorizedAccessException("Credenciales inv�lidas");
+            throw new UnauthorizedAccessException("Credenciales inválidas");
         }
 
         if (!credencial.Activo)
@@ -550,8 +596,11 @@ public class IdentityService : IIdentityService
         return true;
     }
 
-    public async Task<bool> UpdateUserEmailAsync(string userId, string newEmail)
+    public async Task<bool> UpdateUserEmailAsync(string userId, string newEmail, bool autoSave = true)
     {
+        _logger.LogInformation("🔍 DEBUG: UpdateUserEmailAsync called for user {UserId}, newEmail: {NewEmail}, autoSave: {AutoSave}", 
+            userId, newEmail, autoSave);
+        
         var user = await _userManager.FindByIdAsync(userId);
         
         if (user == null)
@@ -560,24 +609,72 @@ public class IdentityService : IIdentityService
             return false;
         }
 
+        _logger.LogInformation("🔍 DEBUG: User found. Current Email: {CurrentEmail}, NormalizedEmail: {NormalizedEmail}, UserName: {UserName}, NormalizedUserName: {NormalizedUserName}",
+            user.Email, user.NormalizedEmail, user.UserName, user.NormalizedUserName);
+
         // Check if new email is already taken
         var existingUser = await _userManager.FindByEmailAsync(newEmail);
         if (existingUser != null && existingUser.Id != userId)
         {
-            _logger.LogWarning("UpdateUserEmail failed: Email {Email} already in use", newEmail);
+            _logger.LogWarning("UpdateUserEmail failed: Email {Email} already in use by user {ExistingUserId}", newEmail, existingUser.Id);
             return false;
         }
 
-        // Update email (UserName = Email in our system)
-        user.Email = newEmail;
-        user.UserName = newEmail;
-        user.EmailConfirmed = false; // Require re-confirmation for new email
+        _logger.LogInformation("🔍 DEBUG: Email not in use, proceeding with update");
+
+        // Update email using UserManager methods to ensure NormalizedEmail is updated
+        var setEmailResult = await _userManager.SetEmailAsync(user, newEmail);
+        if (!setEmailResult.Succeeded)
+        {
+            _logger.LogWarning(
+                "Failed to set email for user {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", setEmailResult.Errors.Select(e => e.Description)));
+            return false;
+        }
+
+        _logger.LogInformation("🔍 DEBUG: After SetEmailAsync - Email: {Email}, NormalizedEmail: {NormalizedEmail}",
+            user.Email, user.NormalizedEmail);
+
+        // Update username (UserName = Email in our system)
+        var setUserNameResult = await _userManager.SetUserNameAsync(user, newEmail);
+        if (!setUserNameResult.Succeeded)
+        {
+            _logger.LogWarning(
+                "Failed to set username for user {UserId}. Errors: {Errors}",
+                userId, string.Join(", ", setUserNameResult.Errors.Select(e => e.Description)));
+            return false;
+        }
+
+        _logger.LogInformation("🔍 DEBUG: After SetUserNameAsync - UserName: {UserName}, NormalizedUserName: {NormalizedUserName}",
+            user.UserName, user.NormalizedUserName);
+
+        // IMPORTANTE: Mantener EmailConfirmed = true durante dual-write sync
+        // El sistema Legacy no requiere re-confirmación de email, mantener consistencia
+        // Si el usuario ya estaba confirmado, debe seguir confirmado después del cambio de email
+        user.EmailConfirmed = true;
+        _logger.LogInformation("🔍 DEBUG: EmailConfirmed set to true to maintain consistency with Legacy system");
 
         var result = await _userManager.UpdateAsync(user);
 
         if (result.Succeeded)
         {
-            _logger.LogInformation("Email updated for user {UserId} to {NewEmail}", userId, newEmail);
+            _logger.LogInformation("🔍 DEBUG: UpdateAsync succeeded");
+            
+            // CRITICAL: UserManager does NOT auto-save to database
+            // We must explicitly call SaveChangesAsync to persist UserManager changes
+            // autoSave defaults to true for standalone calls, can be false if caller manages transaction
+            if (autoSave)
+            {
+                _logger.LogInformation("🔍 DEBUG: Calling SaveChangesAsync to persist changes");
+                var changesSaved = await _context.SaveChangesAsync();
+                _logger.LogInformation("🔍 DEBUG: SaveChangesAsync returned {ChangesSaved} changes saved", changesSaved);
+            }
+            else
+            {
+                _logger.LogInformation("🔍 DEBUG: Skipping SaveChangesAsync (autoSave = false), caller will handle it");
+            }
+            
+            _logger.LogInformation("✅ Email updated for user {UserId} to {NewEmail}", userId, newEmail);
         }
         else
         {

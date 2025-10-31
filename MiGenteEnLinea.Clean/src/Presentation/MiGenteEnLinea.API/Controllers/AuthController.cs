@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MiGenteEnLinea.Application.Common.Exceptions;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ActivateAccount;
@@ -230,6 +231,7 @@ public class AuthController : ControllerBase
     /// 
     /// </remarks>
     [HttpPost("change-password")]
+    [Authorize]
     [ProducesResponseType(typeof(ChangePasswordResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -406,7 +408,7 @@ public class AuthController : ControllerBase
                 message = "Credencial actualizada exitosamente.",
                 userId = command.UserId,
                 email = command.Email,
-                activo = command.Activo
+                activo = command.Activo.ToString().ToLower()
             });
         }
         catch (Exception ex)
@@ -466,11 +468,19 @@ public class AuthController : ControllerBase
         {
             var result = await _mediator.Send(command);
 
-            _logger.LogInformation("Usuario registrado exitosamente - UserId: {UserId}", result.UserId);
+            // ✅ Verificar si el registro fue exitoso ANTES de CreatedAtAction
+            if (!result.Success)
+            {
+                _logger.LogWarning("Registro fallido: {Message}", result.Message);
+                return BadRequest(new { message = result.Message });
+            }
+
+            _logger.LogInformation("Usuario registrado exitosamente - IdentityUserId: {IdentityUserId}, CredentialId: {CredentialId}", 
+                result.IdentityUserId, result.CredentialId);
 
             return CreatedAtAction(
                 nameof(GetPerfil),
-                new { userId = result.UserId },
+                new { userId = result.IdentityUserId }, // ✅ IdentityUserId (GUID) para routing correcto
                 result);
         }
         catch (InvalidOperationException ex)
@@ -1397,24 +1407,12 @@ public class AuthController : ControllerBase
     {
         _logger.LogInformation("POST /api/auth/forgot-password - Email: {Email}", command.Email);
 
-        try
-        {
-            var success = await _mediator.Send(command);
+        // Handler throws NotFoundException if email not found
+        // GlobalExceptionHandlerMiddleware will convert to 404
+        await _mediator.Send(command);
 
-            if (!success)
-            {
-                _logger.LogWarning("ForgotPassword fallido - Email no encontrado: {Email}", command.Email);
-                return NotFound(new { message = "No se encontró un usuario con ese email." });
-            }
-
-            _logger.LogInformation("Token de recuperación enviado - Email: {Email}", command.Email);
-            return Ok(new { message = "Se ha enviado un código de recuperación a su email." });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error al procesar forgot-password - Email: {Email}", command.Email);
-            return BadRequest(new { message = ex.Message });
-        }
+        _logger.LogInformation("Token de recuperación enviado - Email: {Email}", command.Email);
+        return Ok(new { message = "Se ha enviado un código de recuperación a su email." });
     }
 
     /// <summary>

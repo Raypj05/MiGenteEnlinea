@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MiGenteEnLinea.Application.Common.Exceptions;
 using MiGenteEnLinea.Application.Common.Interfaces;
 using MiGenteEnLinea.Domain.Interfaces.Repositories;
 
@@ -83,15 +84,17 @@ public sealed class ResendActivationEmailCommandHandler : IRequestHandler<Resend
             _logger.LogWarning(
                 "No se encontró credencial para userId: {UserId}",
                 perfil.UserId);
-            return false;
+            return false; // Usuario no existe
         }
 
         if (credencial.Activo)
         {
-            _logger.LogInformation(
-                "Usuario ya está activo, no se reenvía email. UserId: {UserId}",
+            _logger.LogWarning(
+                "Usuario ya está activo, no se puede reenviar email. UserId: {UserId}",
                 perfil.UserId);
-            return false; // Usuario ya activado, no reenviar
+            
+            // Lanzar BadRequestException para que el controller devuelva 400
+            throw new BadRequestException("La cuenta ya está activa. No es necesario reenviar el email de activación.");
         }
 
         // ================================================================================

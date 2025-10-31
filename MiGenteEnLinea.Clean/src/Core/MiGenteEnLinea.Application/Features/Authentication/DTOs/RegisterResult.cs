@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MiGenteEnLinea.Application.Features.Authentication.DTOs;
 
 /// <summary>
@@ -16,9 +18,20 @@ public class RegisterResult
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// ID del usuario creado (GUID)
+    /// ID del usuario creado (Legacy Credenciales table - int ID)
+    /// Este es el ID entero de la tabla Credenciales para compatibilidad con tests y sistema Legacy
+    /// Serializado como "userId" para mantener compatibilidad con tests existentes
     /// </summary>
-    public string? UserId { get; set; }
+    [JsonPropertyName("userId")]
+    public int? CredentialId { get; set; }
+
+    /// <summary>
+    /// ID del usuario en Identity (GUID) - Primary Key del sistema
+    /// Usado para CreatedAtAction routing en AuthController
+    /// Serializado como "identityUserId" para evitar colisión con "userId"
+    /// </summary>
+    [JsonPropertyName("identityUserId")]
+    public string? IdentityUserId { get; set; }
 
     /// <summary>
     /// Email del usuario creado

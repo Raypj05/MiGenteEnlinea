@@ -2,6 +2,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.ActivateAccount;
@@ -11,6 +12,7 @@ using MiGenteEnLinea.Application.Features.Authentication.Commands.RefreshToken;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.Register;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.RevokeToken;
 using MiGenteEnLinea.Application.Features.Authentication.DTOs;
+using MiGenteEnLinea.Infrastructure.Identity;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
 using MiGenteEnLinea.Domain.ValueObjects; // Email VO for equality queries
 using MiGenteEnLinea.IntegrationTests.Infrastructure;
@@ -23,6 +25,28 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
 {
     public AuthControllerIntegrationTests(TestWebApplicationFactory factory) : base(factory)
     {
+    }
+
+    /// <summary>
+    /// Helper: Crea un usuario con Identity y retorna email + password
+    /// </summary>
+    private async Task<(string Email, string Password)> CreateTestUserAsync()
+    {
+        var userManager = Factory.Services.GetRequiredService<UserManager<ApplicationUser>>();
+        var testEmail = $"testuser{Guid.NewGuid():N}@example.com";
+        var testPassword = "Test123!";
+        
+        var user = new ApplicationUser
+        {
+            UserName = testEmail,
+            Email = testEmail,
+            EmailConfirmed = true
+        };
+        
+        var result = await userManager.CreateAsync(user, testPassword);
+        result.Succeeded.Should().BeTrue($"User creation failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+        
+        return (testEmail, testPassword);
     }
 
     #region Register Tests
@@ -53,7 +77,7 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
         
         // VALIDACIONES DTO
         result.Should().NotBeNull();
-        result!.UserId.Should().NotBeNullOrEmpty();
+        result!.CredentialId.Should().BeGreaterThan(0);
         result!.Email.Should().Be(email);
         result!.Success.Should().BeTrue();
 
@@ -150,14 +174,39 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
     [Fact]
     public async Task Login_WithValidCredentials_ReturnsTokens()
     {
+        // ✅ CREAR USUARIO DIRECTAMENTE EN EL TEST CON IDENTITY
+        var userManager = Factory.Services.GetRequiredService<UserManager<ApplicationUser>>();
+        var testEmail = $"testuser{Guid.NewGuid():N}@example.com"; // Email único
+        var testPassword = "Test123!";
+        
+        // Crear usuario con Identity
+        var user = new ApplicationUser
+        {
+            UserName = testEmail,
+            Email = testEmail,
+            EmailConfirmed = true
+        };
+        
+        var createResult = await userManager.CreateAsync(user, testPassword);
+        createResult.Succeeded.Should().BeTrue($"User creation failed: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
+        
+        // Ahora intentar login
         var loginCommand = new LoginCommand
         {
-            Email = "juan.perez@test.com",
-            Password = TestDataSeeder.TestPasswordPlainText,
+            Email = testEmail,
+            Password = testPassword,
             IpAddress = "127.0.0.1"
         };
 
         var response = await Client.PostAsJsonAsync("/api/auth/login", loginCommand);
+
+        // DEBUG: Ver qué error devuelve
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"❌ Login failed with status {response.StatusCode}");
+            Console.WriteLine($"❌ Error content: {errorContent}");
+        }
 
         response.IsSuccessStatusCode.Should().BeTrue();
         var result = await response.Content.ReadFromJsonAsync<AuthenticationResultDto>();
@@ -275,22 +324,32 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
     [Fact]
     public async Task ChangePassword_WithValidCredentials_ChangesPassword()
     {
-        var token = await LoginAsync("juan.perez@test.com", TestDataSeeder.TestPasswordPlainText);
-        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        // ✅ Use fresh DbContext to avoid caching issues
-        using var scope = Factory.Services.CreateScope();
-        var freshContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
+        // ✅ Crear usuario con Identity
+        var (testEmail, testPassword) = await CreateTestUserAsync();
         
-        var emailVO = Email.CreateUnsafe("juan.perez@test.com");
-        var credencial = await freshContext.CredencialesRefactored
-            .AsNoTracking()
-            .FirstAsync(c => c.Email == emailVO);
+        // Login para obtener token (hacer request HTTP directo)
+        var loginCommand = new LoginCommand
+        {
+            Email = testEmail,
+            Password = testPassword,
+            IpAddress = "127.0.0.1"
+        };
+        var loginResponse = await Client.PostAsJsonAsync("/api/auth/login", loginCommand);
+        loginResponse.IsSuccessStatusCode.Should().BeTrue("Login should succeed with valid credentials");
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<AuthenticationResultDto>();
+        
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult!.AccessToken);
+
+        // ✅ Obtener userId del usuario recién creado
+        using var scope = Factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.FindByEmailAsync(testEmail);
+        user.Should().NotBeNull("El usuario debería existir después de ser creado");
 
         var changePasswordCommand = new ChangePasswordCommand(
-            Email: "juan.perez@test.com",
-            UserId: credencial.UserId,
-            CurrentPassword: TestDataSeeder.TestPasswordPlainText,
+            Email: testEmail,
+            UserId: user!.Id,
+            CurrentPassword: testPassword,
             NewPassword: "NewPassword@123"
         );
 
@@ -301,12 +360,12 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
         Client.DefaultRequestHeaders.Authorization = null;
         var loginWithNewPassword = new LoginCommand
         {
-            Email = "juan.perez@test.com",
+            Email = testEmail, // ✅ Usar testEmail, no juan.perez
             Password = "NewPassword@123",
             IpAddress = "127.0.0.1"
         };
-        var loginResponse = await Client.PostAsJsonAsync("/api/auth/login", loginWithNewPassword);
-        loginResponse.IsSuccessStatusCode.Should().BeTrue();
+        var newPasswordLoginResponse = await Client.PostAsJsonAsync("/api/auth/login", loginWithNewPassword);
+        newPasswordLoginResponse.IsSuccessStatusCode.Should().BeTrue();
     }
 
     [Fact]
@@ -331,10 +390,14 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
     [Fact]
     public async Task RefreshToken_WithValidToken_ReturnsNewTokens()
     {
+        // ✅ Crear usuario con Identity
+        var (testEmail, testPassword) = await CreateTestUserAsync();
+        
+        // Login para obtener refresh token
         var loginCommand = new LoginCommand
         {
-            Email = "juan.perez@test.com",
-            Password = TestDataSeeder.TestPasswordPlainText,
+            Email = testEmail,
+            Password = testPassword,
             IpAddress = "127.0.0.1"
         };
         var loginResponse = await Client.PostAsJsonAsync("/api/auth/login", loginCommand);
@@ -374,10 +437,14 @@ public class AuthControllerIntegrationTests : IntegrationTestBase
     [Fact]
     public async Task RevokeToken_WithValidToken_RevokesSuccessfully()
     {
+        // ✅ Crear usuario con Identity
+        var (testEmail, testPassword) = await CreateTestUserAsync();
+        
+        // Login para obtener refresh token
         var loginCommand = new LoginCommand
         {
-            Email = "juan.perez@test.com",
-            Password = TestDataSeeder.TestPasswordPlainText,
+            Email = testEmail,
+            Password = testPassword,
             IpAddress = "127.0.0.1"
         };
         var loginResponse = await Client.PostAsJsonAsync("/api/auth/login", loginCommand);

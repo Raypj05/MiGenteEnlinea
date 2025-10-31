@@ -1038,6 +1038,12 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("created_by");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Descripcion")
                         .HasMaxLength(500)
                         .IsUnicode(false)
@@ -1063,6 +1069,9 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("habilidades");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2")
@@ -1546,6 +1555,46 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_EmpleadosTemporales_UserId_Activo");
 
                     b.ToTable("Empleados_Temporales", (string)null);
+                });
+
+            modelBuilder.Entity("MiGenteEnLinea.Domain.Entities.Empleados.Remuneracion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("descripcion");
+
+                    b.Property<int>("EmpleadoId")
+                        .HasColumnType("int")
+                        .HasColumnName("empleadoID");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("monto");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("userID");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpleadoId")
+                        .HasDatabaseName("IX_Remuneraciones_EmpleadoId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_Remuneraciones_UserId");
+
+                    b.ToTable("Remuneraciones", (string)null);
                 });
 
             modelBuilder.Entity("MiGenteEnLinea.Domain.Entities.Nominas.DeduccionTss", b =>
@@ -3282,7 +3331,7 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
 
                     b.ToTable((string)null);
 
-                    b.ToView("VPerfiles", (string)null);
+                    b.ToSqlQuery("\r\n            SELECT \r\n                p.perfilID,\r\n                p.fechaCreacion,\r\n                p.userID,\r\n                p.Tipo,\r\n                p.Nombre,\r\n                p.Apellido,\r\n                p.Email,\r\n                p.telefono1,\r\n                p.telefono2,\r\n                p.usuario,\r\n                pi.id,\r\n                pi.tipoIdentificacion,\r\n                pi.identificacion,\r\n                pi.direccion,\r\n                pi.fotoPerfil,\r\n                pi.presentacion,\r\n                pi.nombreComercial,\r\n                pi.cedulaGerente,\r\n                pi.nombreGerente,\r\n                pi.apellidoGerente,\r\n                pi.direccionGerente\r\n            FROM Perfiles p\r\n            LEFT JOIN perfilesInfo pi ON p.perfilID = pi.perfilID\r\n        ");
                 });
 
             modelBuilder.Entity("MiGenteEnLinea.Domain.ReadModels.VistaPromedioCalificacion", b =>
@@ -3482,222 +3531,6 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens", (string)null);
-                });
-
-            modelBuilder.Entity("MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated.Empleado", b =>
-                {
-                    b.Property<int>("EmpleadoId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("empleadoID");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmpleadoId"));
-
-                    b.Property<bool?>("Activo")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Alias")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("alias");
-
-                    b.Property<string>("Apellido")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<string>("ContactoEmergencia")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("contactoEmergencia");
-
-                    b.Property<bool?>("Contrato")
-                        .HasColumnType("bit")
-                        .HasColumnName("contrato");
-
-                    b.Property<int?>("DiasPago")
-                        .HasColumnType("int")
-                        .HasColumnName("diasPago");
-
-                    b.Property<string>("Direccion")
-                        .HasMaxLength(250)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(250)")
-                        .HasColumnName("direccion");
-
-                    b.Property<int?>("EstadoCivil")
-                        .HasColumnType("int")
-                        .HasColumnName("estadoCivil");
-
-                    b.Property<DateOnly?>("FechaInicio")
-                        .HasColumnType("date")
-                        .HasColumnName("fechaInicio");
-
-                    b.Property<DateTime?>("FechaRegistro")
-                        .HasColumnType("datetime")
-                        .HasColumnName("fechaRegistro");
-
-                    b.Property<DateTime?>("FechaSalida")
-                        .HasColumnType("datetime")
-                        .HasColumnName("fechaSalida");
-
-                    b.Property<string>("Foto")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)")
-                        .HasColumnName("foto");
-
-                    b.Property<string>("Identificacion")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("identificacion");
-
-                    b.Property<decimal?>("MontoExtra1")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("montoExtra1");
-
-                    b.Property<decimal?>("MontoExtra2")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("montoExtra2");
-
-                    b.Property<decimal?>("MontoExtra3")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("montoExtra3");
-
-                    b.Property<string>("MotivoBaja")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("motivoBaja");
-
-                    b.Property<string>("Municipio")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("municipio");
-
-                    b.Property<DateOnly?>("Nacimiento")
-                        .HasColumnType("date")
-                        .HasColumnName("nacimiento");
-
-                    b.Property<string>("Nombre")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<int?>("PeriodoPago")
-                        .HasColumnType("int")
-                        .HasColumnName("periodoPago");
-
-                    b.Property<string>("Posicion")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("posicion");
-
-                    b.Property<decimal?>("Prestaciones")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("prestaciones");
-
-                    b.Property<string>("Provincia")
-                        .HasMaxLength(50)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("provincia");
-
-                    b.Property<string>("RemuneracionExtra1")
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("remuneracionExtra1");
-
-                    b.Property<string>("RemuneracionExtra2")
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("remuneracionExtra2");
-
-                    b.Property<string>("RemuneracionExtra3")
-                        .HasMaxLength(100)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("remuneracionExtra3");
-
-                    b.Property<decimal?>("Salario")
-                        .HasColumnType("decimal(10, 2)")
-                        .HasColumnName("salario");
-
-                    b.Property<string>("Telefono1")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("telefono1");
-
-                    b.Property<string>("Telefono2")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("telefono2");
-
-                    b.Property<string>("TelefonoEmergencia")
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("telefonoEmergencia");
-
-                    b.Property<bool?>("Tss")
-                        .HasColumnType("bit")
-                        .HasColumnName("tss");
-
-                    b.Property<string>("UserId")
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(max)")
-                        .HasColumnName("userID");
-
-                    b.HasKey("EmpleadoId");
-
-                    b.ToTable("Empleado", (string)null);
-                });
-
-            modelBuilder.Entity("MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated.Remuneracione", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Descripcion")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("descripcion");
-
-                    b.Property<int?>("EmpleadoId")
-                        .HasColumnType("int")
-                        .HasColumnName("empleadoID");
-
-                    b.Property<decimal?>("Monto")
-                        .HasColumnType("decimal(18, 2)")
-                        .HasColumnName("monto");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)")
-                        .HasColumnName("userID");
-
-                    b.HasKey("Id")
-                        .HasName("PK_Remuneraciones");
-
-                    b.HasIndex(new[] { "EmpleadoId" }, "IX_Remuneraciones_EmpleadoId");
-
-                    b.HasIndex(new[] { "UserId" }, "IX_Remuneraciones_UserId");
-
-                    b.ToTable("Remuneraciones", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -3970,17 +3803,6 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated.Remuneracione", b =>
-                {
-                    b.HasOne("MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated.Empleado", "Empleado")
-                        .WithMany("Remuneraciones")
-                        .HasForeignKey("EmpleadoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .HasConstraintName("FK_Remuneraciones_Empleados");
-
-                    b.Navigation("Empleado");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -4035,11 +3857,6 @@ namespace MiGenteEnLinea.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MiGenteEnLinea.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Navigation("RefreshTokens");
-                });
-
-            modelBuilder.Entity("MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated.Empleado", b =>
-                {
-                    b.Navigation("Remuneraciones");
                 });
 #pragma warning restore 612, 618
         }

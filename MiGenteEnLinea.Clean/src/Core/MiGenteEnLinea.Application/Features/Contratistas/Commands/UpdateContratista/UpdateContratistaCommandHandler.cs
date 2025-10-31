@@ -1,5 +1,7 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using MiGenteEnLinea.Application.Common.Interfaces;
+using MiGenteEnLinea.Application.Common.Exceptions;
 using MiGenteEnLinea.Domain.Interfaces.Repositories;
 using MiGenteEnLinea.Domain.Interfaces.Repositories.Contratistas;
 using MiGenteEnLinea.Domain.ValueObjects;
@@ -9,19 +11,28 @@ namespace MiGenteEnLinea.Application.Features.Contratistas.Commands.UpdateContra
 /// <summary>
 /// Handler: Actualiza el perfil de un contratista
 /// </summary>
+/// <remarks>
+/// ✅ SECURITY FIX (Oct 30, 2025): Ownership validation implementada
+/// - Verifica que el usuario solo pueda editar su propio perfil
+/// - Admins pueden editar cualquier perfil (bypass)
+/// - Lanza ForbiddenAccessException (403) si no tiene permisos
+/// </remarks>
 public class UpdateContratistaCommandHandler : IRequestHandler<UpdateContratistaCommand>
 {
     private readonly IContratistaRepository _contratistaRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UpdateContratistaCommandHandler> _logger;
 
     public UpdateContratistaCommandHandler(
         IContratistaRepository contratistaRepository,
         IUnitOfWork unitOfWork,
+        ICurrentUserService currentUserService,
         ILogger<UpdateContratistaCommandHandler> logger)
     {
         _contratistaRepository = contratistaRepository;
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
         _logger = logger;
     }
 
@@ -39,7 +50,27 @@ public class UpdateContratistaCommandHandler : IRequestHandler<UpdateContratista
             throw new InvalidOperationException($"No existe un perfil de contratista para el usuario {request.UserId}");
         }
 
-        // 2. ACTUALIZAR PERFIL BÁSICO (si hay cambios)
+        // ============================================
+        // 2. SECURITY CHECK - Ownership validation
+        // ============================================
+        var currentUserId = _currentUserService.UserId;
+        var isAdmin = _currentUserService.IsInRole("Admin");
+
+        // Verificar que el usuario actual sea el dueño del perfil O sea Admin
+        if (currentUserId != request.UserId && !isAdmin)
+        {
+            _logger.LogWarning(
+                "⚠️ INTENTO DE ACCESO NO AUTORIZADO: Usuario {CurrentUserId} intentó editar perfil de contratista {TargetUserId}",
+                currentUserId, request.UserId);
+
+            throw new ForbiddenAccessException("No tiene permisos para editar este perfil de contratista.");
+        }
+
+        _logger.LogInformation(
+            "✅ Authorization check passed. CurrentUser: {CurrentUserId}, TargetUser: {TargetUserId}, IsAdmin: {IsAdmin}",
+            currentUserId, request.UserId, isAdmin);
+
+        // 3. ACTUALIZAR PERFIL BÁSICO (si hay cambios)
         bool hayCambiosPerfil = request.Titulo != null ||
                                 request.Sector != null ||
                                 request.Experiencia.HasValue ||

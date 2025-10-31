@@ -35,11 +35,10 @@ public sealed class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswor
             .Where(c => c.Email == request.Email && c.Activo)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Security: No revelar si el email existe o no (siempre retornar true)
         if (credencial == null)
         {
             _logger.LogWarning("ForgotPassword: Email no encontrado o cuenta inactiva - {Email}", request.Email);
-            return true; // No revelar que el email no existe
+            throw new Common.Exceptions.NotFoundException("Usuario", request.Email);
         }
 
         // Generar token seguro (6 dígitos)

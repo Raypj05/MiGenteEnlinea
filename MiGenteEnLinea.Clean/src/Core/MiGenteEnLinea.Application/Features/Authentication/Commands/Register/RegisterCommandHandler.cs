@@ -52,7 +52,8 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
             return new RegisterResult
             {
                 Success = false,
-                UserId = null,
+                CredentialId = null,
+                IdentityUserId = null, // No hay userId si el registro falló
                 Message = "El correo electrónico ya está registrado en el sistema"
             };
         }
@@ -84,7 +85,8 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
             return new RegisterResult
             {
                 Success = false,
-                UserId = null,
+                CredentialId = null,
+                IdentityUserId = null,
                 Message = "Error al registrar usuario. Por favor, intenta nuevamente."
             };
         }
@@ -95,6 +97,8 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
         // Nota: Esto es temporal durante la migración. Eventualmente toda la lógica de negocio
         //       usará Identity y estas tablas se deprecarán.
 
+        int? credencialId = null;
+        
         try
         {
             // 3.1 Crear Perfil (tabla Perfiles - usada en lógica de negocio)
@@ -149,9 +153,12 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
             // 3.4 Guardar cambios Legacy
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+            // 3.5 Obtener el ID de la credencial creada (para compatibilidad con tests Legacy)
+            credencialId = credencial.Id;
+
             _logger.LogInformation(
-                "Tablas Legacy sincronizadas para usuario: {UserId}",
-                userId);
+                "Tablas Legacy sincronizadas para usuario: {UserId}, CredencialId: {CredencialId}",
+                userId, credencialId);
         }
         catch (Exception ex)
         {
@@ -165,7 +172,8 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
             return new RegisterResult
             {
                 Success = true,
-                UserId = userId,
+                CredentialId = null, // No tenemos el ID de Legacy si falló
+                IdentityUserId = userId, // GUID de Identity (usuario sí existe)
                 Email = request.Email,
                 Message = "Registro exitoso. Revisa tu correo para activar tu cuenta. (Nota: Algunas funcionalidades pueden requerir configuración adicional)"
             };
@@ -199,7 +207,8 @@ public sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, Re
         return new RegisterResult
         {
             Success = true,
-            UserId = userId,
+            CredentialId = credencialId, // int de Legacy Credenciales (para compatibilidad con tests)
+            IdentityUserId = userId, // GUID de Identity (para routing en controller)
             Email = request.Email,
             Message = "Registro exitoso. Por favor revisa tu correo electrónico para activar tu cuenta."
         };

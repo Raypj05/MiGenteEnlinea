@@ -75,8 +75,62 @@ public class UpdateProfileExtendedCommandHandler : IRequestHandler<UpdateProfile
                 .Where(pi => pi.UserId == request.UserId)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (perfilInfo != null)
+            // ✅ FIX: Crear PerfilesInfo si no existe (GAP-002: AddProfileInfo functionality)
+            if (perfilInfo == null)
             {
+                _logger.LogInformation(
+                    "PerfilesInfo no existe, creando nuevo registro - UserId: {UserId}",
+                    request.UserId);
+
+                // Determinar si es persona física o empresa basándose en tipoIdentificacion
+                // 1 = Cédula (persona física), 2 = Pasaporte (persona física), 3 = RNC (empresa)
+                if (request.TipoIdentificacion == 3 && !string.IsNullOrWhiteSpace(request.NombreComercial))
+                {
+                    // Crear perfil de empresa
+                    perfilInfo = Domain.Entities.Seguridad.PerfilesInfo.CrearPerfilEmpresa(
+                        userId: request.UserId,
+                        rnc: request.Identificacion ?? string.Empty,
+                        nombreComercial: request.NombreComercial,
+                        direccion: request.Direccion,
+                        presentacion: request.Presentacion);
+                }
+                else
+                {
+                    // Crear perfil de persona física
+                    perfilInfo = Domain.Entities.Seguridad.PerfilesInfo.CrearPerfilPersonaFisica(
+                        userId: request.UserId,
+                        cedula: request.Identificacion ?? string.Empty,
+                        direccion: request.Direccion,
+                        presentacion: request.Presentacion);
+                }
+
+                // Actualizar campos adicionales si se proveen
+                if (request.FotoPerfil != null && request.FotoPerfil.Length > 0)
+                {
+                    perfilInfo.ActualizarFotoPerfil(request.FotoPerfil);
+                }
+
+                if (request.CedulaGerente != null ||
+                    request.NombreGerente != null ||
+                    request.ApellidoGerente != null ||
+                    request.DireccionGerente != null)
+                {
+                    perfilInfo.ActualizarInformacionGerente(
+                        request.CedulaGerente,
+                        request.NombreGerente,
+                        request.ApellidoGerente,
+                        request.DireccionGerente);
+                }
+
+                await _context.PerfilesInfos.AddAsync(perfilInfo, cancellationToken);
+
+                _logger.LogInformation(
+                    "PerfilesInfo creado - UserId: {UserId}",
+                    request.UserId);
+            }
+            else
+            {
+                // PerfilesInfo ya existe, actualizarlo
                 if (request.Identificacion != null)
                 {
                     perfilInfo.ActualizarIdentificacion(
@@ -122,12 +176,6 @@ public class UpdateProfileExtendedCommandHandler : IRequestHandler<UpdateProfile
                     "PerfilesInfo actualizado - UserId: {UserId}, PerfilInfoId: {PerfilInfoId}",
                     request.UserId,
                     perfilInfo.Id);
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "PerfilesInfo no encontrado para UserId: {UserId} - No se actualizó información adicional",
-                    request.UserId);
             }
         }
 

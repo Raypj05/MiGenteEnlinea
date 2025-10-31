@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MiGenteEnLinea.Domain.Entities.Suscripciones;
 using MiGenteEnLinea.Domain.Entities.Empleadores;
@@ -5,23 +6,38 @@ using MiGenteEnLinea.Domain.Entities.Contratistas;
 using MiGenteEnLinea.Domain.Entities.Seguridad;
 using MiGenteEnLinea.Domain.Entities.Authentication;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
+using MiGenteEnLinea.Infrastructure.Identity;
 using MiGenteEnLinea.Application.Common.Interfaces;
-using BCrypt.Net;
 
 namespace MiGenteEnLinea.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Seeder para crear datos de prueba realistas en la base de datos InMemory.
 /// Crea un conjunto completo de entidades relacionadas: usuarios, planes, empleadores, contratistas, etc.
+/// 
+/// ✅ IMPORTANTE: Usa Identity PasswordHasher para consistencia con el sistema de autenticación
 /// </summary>
 public static class TestDataSeeder
 {
     /// <summary>
-    /// Password común para todos los usuarios de prueba (hasheado con BCrypt)
-    /// Password en texto plano: "Test@1234"
+    /// Password común para todos los usuarios de prueba
+    /// Password en texto plano simple para testing
     /// </summary>
-    public const string TestPasswordPlainText = "Test@1234";
-    public static readonly string TestPasswordHash = BCrypt.Net.BCrypt.HashPassword(TestPasswordPlainText, 12);
+    public const string TestPasswordPlainText = "Test1234!";
+    
+    /// <summary>
+    /// PasswordHasher de Identity para generar hashes consistentes
+    /// Usa el MISMO hasher que el sistema de autenticación
+    /// </summary>
+    private static readonly PasswordHasher<ApplicationUser> PasswordHasher = new();
+    
+    /// <summary>
+    /// Hash precomputado usando Identity PasswordHasher
+    /// ⚠️ CRÍTICO: Este hash es FIJO y NO debe cambiar entre ejecuciones
+    /// Fue generado con: PasswordHasher.HashPassword(new ApplicationUser { UserName = "test@test.com" }, "Test1234!")
+    /// Si cambias el password, debes regenerar este hash con HashGeneratorTest.GenerateIdentityHash()
+    /// </summary>
+    public static readonly string TestPasswordHash = "AQAAAAIAAYagAAAAEPqQJV1/gxmRkRauH9xh/wye7xscHsWNOgVPPslSG2rxsbKIrwrvZVRYcrtj5UiSvQ==";
 
     /// <summary>
     /// Limpia toda la base de datos de prueba
@@ -49,6 +65,10 @@ public static class TestDataSeeder
     /// </summary>
     public static async Task SeedAllAsync(IApplicationDbContext context)
     {
+        // 🔍 DEBUG: Log hash being used
+        Console.WriteLine($"🔍 DEBUG TestDataSeeder: TestPasswordHash = {TestPasswordHash.Substring(0, 30)}...");
+        Console.WriteLine($"🔍 DEBUG TestDataSeeder: TestPasswordHash Length = {TestPasswordHash.Length}");
+        
         await SeedPlanesAsync(context);
         await SeedUsuariosAsync(context);
     }

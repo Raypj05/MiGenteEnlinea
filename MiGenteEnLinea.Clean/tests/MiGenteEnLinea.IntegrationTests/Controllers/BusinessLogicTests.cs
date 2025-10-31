@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using FluentAssertions;
 using MiGenteEnLinea.Application.Features.Empleados.DTOs;
 using MiGenteEnLinea.Application.Features.Suscripciones.DTOs;
@@ -25,8 +25,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task GetDeduccionesTss_WithAuthentication_ReturnsActiveTssDeductions()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.tss@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.tss@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.tss@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         // Act
         var response = await Client.GetAsync("/api/empleados/deducciones-tss");
@@ -42,8 +42,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task GetDeduccionesTss_ReturnsDeductionsWithValidPercentages()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.tss2@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.tss2@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.tss2@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         // Act
         var response = await Client.GetAsync("/api/empleados/deducciones-tss");
@@ -77,8 +77,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task CreateSuscripcion_WithPastStartDate_CalculatesExpirationCorrectly()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.expiry@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.expiry@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.expiry@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         // Create subscription starting 10 days ago (should expire in 20 days from now)
         var command = new CreateSuscripcionCommand
@@ -102,8 +102,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task GetSuscripcion_AfterCreation_ReturnsActiveStatus()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.active@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.active@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.active@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         var command = new CreateSuscripcionCommand
         {
@@ -129,8 +129,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task CreateSuscripcion_WithInvalidPlanId_ReturnsBadRequest()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.invalid@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.invalid@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.invalid@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         var command = new CreateSuscripcionCommand
         {
@@ -155,8 +155,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task GetPlanesEmpleadores_ReturnsActivePlans()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.planes1@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.planes1@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.planes1@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         // Act
         var response = await Client.GetAsync("/api/suscripciones/planes-empleadores");
@@ -178,8 +178,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task GetPlanesContratistas_ReturnsActivePlans()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.planes2@example.com", "Test123!@#", "Contratista", "Test", "User");
-        await LoginAsync("test.planes2@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.planes2@example.com", "Test123!@#", "Contratista", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         // Act
         var response = await Client.GetAsync("/api/suscripciones/planes-contratistas");
@@ -217,8 +217,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task CreateSuscripcion_WithNullFechaInicio_UsesTodayAsDefault()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.default@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.default@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.default@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         var command = new CreateSuscripcionCommand
         {
@@ -241,8 +241,8 @@ public class BusinessLogicTests : IntegrationTestBase
     public async Task GetSuscripcion_ForNonExistentUser_ReturnsNotFound()
     {
         // Arrange
-        var userId = await RegisterUserAsync("test.notfound@example.com", "Test123!@#", "Empleador", "Test", "User");
-        await LoginAsync("test.notfound@example.com", "Test123!@#");
+        var (userId, email) = await RegisterUserAsync("test.notfound@example.com", "Test123!@#", "Empleador", "Test", "User");
+        await LoginAsync(email, "Test123!@#");
 
         // Act - Try to get subscription for non-existent user
         var response = await Client.GetAsync($"/api/suscripciones/{Guid.NewGuid()}");

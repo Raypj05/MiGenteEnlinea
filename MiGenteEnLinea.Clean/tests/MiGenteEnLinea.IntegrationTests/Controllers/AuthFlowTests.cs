@@ -10,6 +10,7 @@ using MiGenteEnLinea.Application.Features.Authentication.Commands.Register;
 using MiGenteEnLinea.Application.Features.Authentication.Commands.RevokeToken;
 using MiGenteEnLinea.Application.Features.Authentication.DTOs;
 using MiGenteEnLinea.Domain.ValueObjects;
+using MiGenteEnLinea.Domain; // ✅ Para acceder a Domain.Entities
 using MiGenteEnLinea.IntegrationTests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
@@ -63,10 +64,18 @@ public class AuthFlowTests : IntegrationTestBase
         
         registerResult.Should().NotBeNull();
         registerResult!.Success.Should().BeTrue();
-        registerResult.UserId.Should().NotBeNullOrEmpty();
+        registerResult.CredentialId.Should().BeGreaterThan(0);
         
-        var userId = registerResult.UserId!;
-        _output.WriteLine($"[PASO 1] ✅ Usuario registrado. UserId: {userId}");
+        var credentialId = registerResult.CredentialId!.Value;
+        _output.WriteLine($"[PASO 1] ✅ Usuario registrado. CredentialId: {credentialId}");
+
+        // ====================================================================
+        // VERIFICAR: Obtener UserId (GUID) desde Credenciales Legacy
+        // ====================================================================
+        var credencial = await AppDbContext.Credenciales
+            .FirstOrDefaultAsync(c => c.Id == credentialId);
+        credencial.Should().NotBeNull("El usuario debe existir en Credenciales (Legacy)");
+        var userId = credencial!.UserId;
 
         // ====================================================================
         // VERIFICAR: Usuario existe en Identity (AspNetUsers)
@@ -82,9 +91,6 @@ public class AuthFlowTests : IntegrationTestBase
         // ====================================================================
         // VERIFICAR: Usuario existe en Legacy (Credenciales + Perfiles)
         // ====================================================================
-        var credencial = await AppDbContext.Credenciales
-            .FirstOrDefaultAsync(c => c.UserId == userId);
-        credencial.Should().NotBeNull("El usuario debe existir en Credenciales (Legacy)");
         
         var perfil = await AppDbContext.Perfiles
             .FirstOrDefaultAsync(p => p.UserId == userId);
@@ -148,28 +154,41 @@ public class AuthFlowTests : IntegrationTestBase
     public async Task Flow_LoginLegacyUser_AutoMigratesToIdentity()
     {
         // ====================================================================
-        // SETUP: Usuario "juan.perez@test.com" existe SOLO en Legacy
-        // (creado por TestDataSeeder en Credenciales + Perfiles)
+        // SETUP: Crear usuario SOLO en Legacy (Credenciales + Perfiles)
+        // Simula un usuario que existía antes de migrar a Identity
         // ====================================================================
-        var email = "juan.perez@test.com";
-        var password = TestDataSeeder.TestPasswordPlainText; // "Test@1234"
+        var email = GenerateUniqueEmail("legacy-user");
+        var password = "LegacyTest@123";
+        var userId = Guid.NewGuid().ToString();
 
-        _output.WriteLine($"[SETUP] Usuario legacy: {email}");
+        _output.WriteLine($"[SETUP] Creando usuario Legacy (solo en Credenciales + Perfiles): {email}");
+
+        // Crear Credencial Legacy con BCrypt hash
+        var passwordHasher = Factory.Services.GetRequiredService<MiGenteEnLinea.Application.Common.Interfaces.IPasswordHasher>();
+        var passwordHash = passwordHasher.HashPassword(password);
+        
+        var emailVO = Email.CreateUnsafe(email);
+        var credencial = Domain.Entities.Authentication.Credencial.Create(
+            userId: userId,
+            email: emailVO,
+            passwordHash: passwordHash
+        );
+        credencial.Activar(); // Activar para que pueda hacer login
+        
+        await AppDbContext.Credenciales.AddAsync(credencial);
+        
+        // ✅ SIMPLIFICADO: No crear Perfil Legacy, solo Credencial
+        // El sistema debe funcionar solo con Credencial (login identity-first)
+        await AppDbContext.SaveChangesAsync();
+
+        _output.WriteLine($"[SETUP] ✅ Usuario Legacy creado (solo Credencial). UserId: {userId}");
 
         // Verificar que NO existe en Identity (antes de login)
         using var scopeBefore = Factory.Services.CreateScope();
         var userManagerBefore = scopeBefore.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<MiGenteEnLinea.Infrastructure.Identity.ApplicationUser>>();
         var userBeforeLogin = await userManagerBefore.FindByEmailAsync(email);
-        _output.WriteLine($"[SETUP] Usuario en Identity (antes de login): {userBeforeLogin?.Email ?? "NULL"}");
-
-        // Verificar que SÍ existe en Legacy
-        // ✅ OPTIMIZADO: Usar Value Object comparison (EF Core puede traducir esto)
-        // Patrón recomendado para producción: comparar Value Objects directamente
-        var emailVO = Email.CreateUnsafe(email);
-        var credencial = await AppDbContext.Credenciales
-            .FirstOrDefaultAsync(c => c.Email == emailVO);
-        credencial.Should().NotBeNull("El usuario debe existir en Credenciales (Legacy)");
-        _output.WriteLine($"[SETUP] ✅ Usuario encontrado en Credenciales (Legacy). UserId: {credencial!.UserId}");
+        userBeforeLogin.Should().BeNull("El usuario NO debe existir en Identity antes del login");
+        _output.WriteLine($"[SETUP] ✅ Verificado: Usuario NO existe en Identity (antes de login)");
 
         // ====================================================================
         // PASO 1: LOGIN (debería buscar en Legacy y migrar a Identity)
@@ -289,8 +308,12 @@ public class AuthFlowTests : IntegrationTestBase
         registerResponse.EnsureSuccessStatusCode();
         
         var registerResult = await registerResponse.Content.ReadFromJsonAsync<RegisterResult>();
-        var userId = registerResult!.UserId!;
-        _output.WriteLine($"[PASO 1] ✅ Usuario registrado. UserId: {userId}");
+        var credentialId = registerResult!.CredentialId!.Value;
+        _output.WriteLine($"[PASO 1] ✅ Usuario registrado. CredentialId: {credentialId}");
+
+        // Get UserId from Credencial
+        var credencial = await AppDbContext.Credenciales.FirstOrDefaultAsync(c => c.Id == credentialId);
+        var userId = credencial!.UserId;
 
         // ====================================================================
         // PASO 2: ACTIVAR CUENTA
@@ -305,9 +328,7 @@ public class AuthFlowTests : IntegrationTestBase
         await userManager.UpdateAsync(user);
         
         // Sincronizar con Legacy
-        var emailVO = Email.CreateUnsafe(email);
-        var credencial = await AppDbContext.Credenciales.FirstOrDefaultAsync(c => c.Email == emailVO);
-        credencial!.Activar();
+        credencial.Activar();
         await AppDbContext.SaveChangesAsync();
         
         _output.WriteLine($"[PASO 2] ✅ Cuenta activada");
@@ -426,7 +447,12 @@ public class AuthFlowTests : IntegrationTestBase
         registerResponse.EnsureSuccessStatusCode();
         
         var registerResult = await registerResponse.Content.ReadFromJsonAsync<RegisterResult>();
-        var userId = registerResult!.UserId!;
+        var credentialId = registerResult!.CredentialId!.Value;
+
+        // Get UserId from Credencial
+        var emailVO = Email.CreateUnsafe(email);
+        var credencial = await AppDbContext.Credenciales.FirstOrDefaultAsync(c => c.Id == credentialId);
+        var userId = credencial!.UserId;
 
         // Activar cuenta
         using var scope = Factory.Services.CreateScope();
@@ -435,9 +461,7 @@ public class AuthFlowTests : IntegrationTestBase
         user!.EmailConfirmed = true;
         await userManager.UpdateAsync(user);
         
-        var emailVO = Email.CreateUnsafe(email);
-        var credencial = await AppDbContext.Credenciales.FirstOrDefaultAsync(c => c.Email == emailVO);
-        credencial!.Activar();
+        credencial.Activar();
         await AppDbContext.SaveChangesAsync();
         
         _output.WriteLine($"[SETUP] ✅ Usuario activado");
@@ -549,7 +573,12 @@ public class AuthFlowTests : IntegrationTestBase
         registerResponse.EnsureSuccessStatusCode();
         
         var registerResult = await registerResponse.Content.ReadFromJsonAsync<RegisterResult>();
-        var userId = registerResult!.UserId!;
+        var credentialId = registerResult!.CredentialId!.Value;
+
+        // Get UserId from Credencial
+        var emailVO = Email.CreateUnsafe(email);
+        var credencial = await AppDbContext.Credenciales.FirstOrDefaultAsync(c => c.Id == credentialId);
+        var userId = credencial!.UserId;
 
         // Activar cuenta
         using var scope = Factory.Services.CreateScope();
@@ -558,9 +587,7 @@ public class AuthFlowTests : IntegrationTestBase
         user!.EmailConfirmed = true;
         await userManager.UpdateAsync(user);
         
-        var emailVO = Email.CreateUnsafe(email);
-        var credencial = await AppDbContext.Credenciales.FirstOrDefaultAsync(c => c.Email == emailVO);
-        credencial!.Activar();
+        credencial.Activar();
         await AppDbContext.SaveChangesAsync();
         
         _output.WriteLine($"[SETUP] ✅ Usuario activado");

@@ -2,12 +2,17 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MiGenteEnLinea.Application.Common.Interfaces;
+using MiGenteEnLinea.Application.Common.Exceptions;
 
 namespace MiGenteEnLinea.Application.Features.Contratistas.Commands.DesactivarPerfil;
 
 /// <summary>
 /// Handler: Desactiva el perfil de un contratista
 /// </summary>
+/// <remarks>
+/// ✅ HTTP STATUS FIX (Oct 30, 2025): Changed InvalidOperationException to NotFoundException
+/// to return proper 404 NotFound instead of 400 BadRequest for non-existent userId
+/// </remarks>
 public class DesactivarPerfilCommandHandler : IRequestHandler<DesactivarPerfilCommand>
 {
     private readonly IApplicationDbContext _context;
@@ -33,7 +38,7 @@ public class DesactivarPerfilCommandHandler : IRequestHandler<DesactivarPerfilCo
         if (contratista == null)
         {
             _logger.LogWarning("Contratista no encontrado para userId: {UserId}", request.UserId);
-            throw new InvalidOperationException($"No existe un perfil de contratista para el usuario {request.UserId}");
+            throw new NotFoundException("Contratista", request.UserId);
         }
 
         // 2. DESACTIVAR PERFIL usando Domain Method

@@ -117,7 +117,14 @@ public interface IIdentityService
     /// <param name="userId">ID del usuario</param>
     /// <param name="newEmail">Nuevo email</param>
     /// <returns>True si se actualizó exitosamente</returns>
-    Task<bool> UpdateUserEmailAsync(string userId, string newEmail);
+    /// <summary>
+    /// Updates the email address for a user in the Identity system
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="newEmail">The new email address</param>
+    /// <param name="autoSave">If true (default), saves changes immediately. If false, caller must save changes via UnitOfWork</param>
+    /// <returns>True if the email was updated successfully</returns>
+    Task<bool> UpdateUserEmailAsync(string userId, string newEmail, bool autoSave = true);
 
     /// <summary>
     /// Obtiene información básica de un usuario por ID

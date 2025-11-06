@@ -305,7 +305,7 @@ public class CalificacionesControllerTests : IClassFixture<TestWebApplicationFac
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var result = await response.Content.ReadFromJsonAsync<dynamic>();
-        result.Should().NotBeNull();
+        result!.Should().NotBeNull(); // Null-forgiving: We expect valid JSON response
     }
 
     [Fact]

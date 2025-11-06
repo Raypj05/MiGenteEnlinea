@@ -16,9 +16,9 @@ public class NumeroEnLetrasService : INumeroEnLetrasService
 
         if (incluirMoneda)
         {
-            // Formato: "MIL PESOS DOMINICANOS 56 /100"
+            // Formato: "MIL PESOS DOMINICANOS 56/100" (sin espacio antes de /)
             var parteEntera = ConvertirNumeroALetras(Convert.ToDouble(entero));
-            var resultado = $"{parteEntera} PESOS DOMINICANOS {decimales:0,0} /100";
+            var resultado = $"{parteEntera} PESOS DOMINICANOS {decimales:00}/100";
             return resultado;
         }
         else

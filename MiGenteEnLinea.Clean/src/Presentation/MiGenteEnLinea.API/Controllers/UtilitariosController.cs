@@ -91,7 +91,7 @@ public class UtilitariosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConvertirNumeroALetras(
         [FromQuery] decimal numero,
-        [FromQuery] bool incluirMoneda = true)
+        [FromQuery] bool incluirMoneda = false) // Default false: solo número sin moneda
     {
         try
         {
@@ -114,12 +114,12 @@ public class UtilitariosController : ControllerBase
                 numero,
                 texto);
 
-            // FIX: Retornar numero como string para evitar problemas de deserialización en tests
+            // FIX: Retornar todas las propiedades como string para Dictionary<string, string>
             return Ok(new
             {
                 numero = numero.ToString("0.##"), // Convert to string with max 2 decimals
                 texto,
-                incluirMoneda
+                incluirMoneda = incluirMoneda.ToString().ToLower() // Convert bool to "true"/"false"
             });
         }
         catch (FluentValidation.ValidationException validationEx)

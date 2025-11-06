@@ -174,218 +174,206 @@ public static class TestDataSeeder
     }
 
     /// <summary>
-    /// Crea 2 empleadores y 2 contratistas de prueba con credenciales activas
+    /// Crea múltiples empleadores y contratistas con IDs predecibles para tests
+    /// IDs: test-empleador-001 a test-empleador-119, test-empleador-301 a test-empleador-307
+    ///      test-contratista-201 a test-contratista-210, test-contratista-305
     /// </summary>
     public static async Task<(List<Empleador> empleadores, List<Contratista> contratistas)> SeedUsuariosAsync(IApplicationDbContext context)
     {
+        // ✅ IDEMPOTENCIA: Check if data already exists to avoid duplicate key errors
+        var existingEmpleadores = await context.Empleadores.AsNoTracking().ToListAsync();
+        var existingContratistas = await context.Contratistas.AsNoTracking().ToListAsync();
+        
+        if (existingEmpleadores.Any() || existingContratistas.Any())
+        {
+            Console.WriteLine($"⏭️ Skipping seeding: {existingEmpleadores.Count} empleadores and {existingContratistas.Count} contratistas already exist in database");
+            return (existingEmpleadores, existingContratistas);
+        }
+        
         var planes = await context.PlanesEmpleadores.ToListAsync();
+        var planesContratistas = await context.PlanesContratistas.ToListAsync();
+        
         if (!planes.Any())
         {
             planes = await SeedPlanesAsync(context);
+        }
+        
+        if (!planesContratistas.Any())
+        {
+            planesContratistas = await SeedPlanesContratistasAsync(context);
         }
 
         var empleadores = new List<Empleador>();
         var contratistas = new List<Contratista>();
 
         // ========================================
-        // EMPLEADOR 1: Juan Pérez (Activo, Con Plan)
+        // SEED EMPLEADORES (001-011, 101-119, 301-307)
         // ========================================
-        var userId1 = Guid.NewGuid().ToString();
         
-        // Crear perfil
-        var perfil1 = Perfile.CrearPerfilEmpleador(
-            userId: userId1,
-            nombre: "Juan",
-            apellido: "Pérez",
-            email: "juan.perez@test.com",
-            telefono1: "809-555-0001");
-        context.Perfiles.Add(perfil1);
-        await context.SaveChangesAsync();
-
-        // Crear credencial
-        var credencial1 = Credencial.Create(
-            userId: userId1,
-            email: Domain.ValueObjects.Email.Create("juan.perez@test.com"),
-            passwordHash: TestPasswordHash);
-        credencial1.Activar(); // Activar la cuenta
-        context.Credenciales.Add(credencial1);
-        await context.SaveChangesAsync();
-
-        // Crear empleador
-        var empleador1 = Empleador.Create(
-            userId: userId1,
-            habilidades: "Gestión de proyectos, Supervisión de equipos",
-            experiencia: "15 años en construcción",
-            descripcion: "Empresa líder en construcción residencial y comercial en Santo Domingo");
-        context.Empleadores.Add(empleador1);
-        await context.SaveChangesAsync();
-
-        // Suscripción activa para empleador1
-        var suscripcion1 = Suscripcion.Create(
-            userId: userId1,
-            planId: planes[1].PlanId, // Plan Profesional
-            duracionMeses: 1);
-        context.Suscripciones.Add(suscripcion1);
-        await context.SaveChangesAsync();
-
-        empleadores.Add(empleador1);
-
-        // ========================================
-        // EMPLEADOR 2: María García (Activo, Sin Plan - para probar flujo de compra)
-        // ========================================
-        var userId2 = Guid.NewGuid().ToString();
-        
-        var perfil2 = Perfile.CrearPerfilEmpleador(
-            userId: userId2,
-            nombre: "María",
-            apellido: "García",
-            email: "maria.garcia@test.com",
-            telefono1: "809-555-0002");
-        context.Perfiles.Add(perfil2);
-        await context.SaveChangesAsync();
-
-        var credencial2 = Credencial.Create(
-            userId: userId2,
-            email: Domain.ValueObjects.Email.Create("maria.garcia@test.com"),
-            passwordHash: TestPasswordHash);
-        credencial2.Activar();
-        context.Credenciales.Add(credencial2);
-        await context.SaveChangesAsync();
-
-        var empleador2 = Empleador.Create(
-            userId: userId2,
-            habilidades: "Desarrollo software, Cloud computing",
-            experiencia: "10 años en tecnología",
-            descripcion: "Empresa de desarrollo de software y consultoría tecnológica");
-        context.Empleadores.Add(empleador2);
-        await context.SaveChangesAsync();
-
-        empleadores.Add(empleador2);
-
-        // ========================================
-        // CONTRATISTA 1: Carlos Rodríguez (Activo, Con Plan)
-        // ========================================
-        var userId3 = Guid.NewGuid().ToString();
-        
-        var perfil3 = Perfile.CrearPerfilContratista(
-            userId: userId3,
-            nombre: "Carlos",
-            apellido: "Rodríguez",
-            email: "carlos.rodriguez@test.com",
-            telefono1: "809-555-0003");
-        context.Perfiles.Add(perfil3);
-        await context.SaveChangesAsync();
-
-        var credencial3 = Credencial.Create(
-            userId: userId3,
-            email: Domain.ValueObjects.Email.Create("carlos.rodriguez@test.com"),
-            passwordHash: TestPasswordHash);
-        credencial3.Activar();
-        context.Credenciales.Add(credencial3);
-        await context.SaveChangesAsync();
-
-        var contratista1 = Contratista.Create(
-            userId: userId3,
-            nombre: "Carlos",
-            apellido: "Rodríguez",
-            tipo: 1, // Persona Física
-            titulo: "Plomero certificado con 10 años de experiencia",
-            identificacion: "001-0000001-0",
-            sector: "Construcción",
-            experiencia: 10,
-            presentacion: "Soy un plomero profesional especializado en instalaciones residenciales y comerciales",
-            telefono1: "809-555-0003",
-            whatsapp1: true,
-            provincia: "Santo Domingo",
-            nivelNacional: false);
-        context.Contratistas.Add(contratista1);
-        await context.SaveChangesAsync();
-
-        // Crear plan contratista si no existe
-        var planContratista = await context.PlanesContratistas.FirstOrDefaultAsync();
-        if (planContratista == null)
+        // Range 1: test-empleador-001 to test-empleador-011 (11 empleadores)
+        for (int i = 1; i <= 11; i++)
         {
-            planContratista = PlanContratista.Create(
-                nombrePlan: "Plan Básico",
-                precio: 300.00m);
-            context.PlanesContratistas.Add(planContratista);
-            await context.SaveChangesAsync();
+            var userId = $"test-empleador-{i:D3}";
+            await SeedEmpleadorAsync(context, userId, $"Empleador{i:D3}", "Test", $"empleador{i:D3}@test.com", planes, empleadores);
+        }
+        
+        // Range 2: test-empleador-101 to test-empleador-119 (19 empleadores)
+        for (int i = 101; i <= 119; i++)
+        {
+            var userId = $"test-empleador-{i}";
+            await SeedEmpleadorAsync(context, userId, $"Empleador{i}", "Test", $"empleador{i}@test.com", planes, empleadores);
+        }
+        
+        // Range 3: test-empleador-301 to test-empleador-307 (7 empleadores)
+        for (int i = 301; i <= 307; i++)
+        {
+            var userId = $"test-empleador-{i}";
+            await SeedEmpleadorAsync(context, userId, $"Empleador{i}", "Test", $"empleador{i}@test.com", planes, empleadores);
         }
 
-        // Suscripción activa para contratista1
-        var suscripcion3 = Suscripcion.Create(
-            userId: userId3,
-            planId: planContratista.PlanId,
-            duracionMeses: 1);
-        context.Suscripciones.Add(suscripcion3);
-        await context.SaveChangesAsync();
-
-        contratistas.Add(contratista1);
-
         // ========================================
-        // CONTRATISTA 2: Ana Martínez (Inactiva - para probar activación)
+        // SEED CONTRATISTAS (201-210, 305)
         // ========================================
-        var userId4 = Guid.NewGuid().ToString();
         
-        var perfil4 = Perfile.CrearPerfilContratista(
-            userId: userId4,
-            nombre: "Ana",
-            apellido: "Martínez",
-            email: "ana.martinez@test.com",
-            telefono1: "809-555-0004");
-        context.Perfiles.Add(perfil4);
-        await context.SaveChangesAsync();
-
-        var credencial4 = Credencial.Create(
-            userId: userId4,
-            email: Domain.ValueObjects.Email.Create("ana.martinez@test.com"),
-            passwordHash: TestPasswordHash);
-        // NO activar la cuenta (credencial4.Activo == false)
-        context.Credenciales.Add(credencial4);
-        await context.SaveChangesAsync();
-
-        var contratista2 = Contratista.Create(
-            userId: userId4,
-            nombre: "Ana",
-            apellido: "Martínez",
-            tipo: 1,
-            titulo: "Electricista",
-            identificacion: "001-0000002-0",
-            sector: "Servicios eléctricos",
-            experiencia: 5,
-            presentacion: "Electricista certificada con experiencia en instalaciones y reparaciones",
-            telefono1: "809-555-0004",
-            whatsapp1: true,
-            provincia: "Santiago");
-        context.Contratistas.Add(contratista2);
-        await context.SaveChangesAsync();
-
-        contratistas.Add(contratista2);
+        // Range 1: test-contratista-201 to test-contratista-210 (10 contratistas)
+        for (int i = 201; i <= 210; i++)
+        {
+            var userId = $"test-contratista-{i}";
+            await SeedContratistaAsync(context, userId, $"Contratista{i}", "Test", $"contratista{i}@test.com", planesContratistas, contratistas);
+        }
+        
+        // Special case: test-contratista-305
+        await SeedContratistaAsync(context, "test-contratista-305", "Contratista305", "Test", "contratista305@test.com", planesContratistas, contratistas);
 
         return (empleadores, contratistas);
     }
-
+    
     /// <summary>
-    /// Obtiene el empleador Juan Pérez (activo con plan)
+    /// Helper method to seed a single Empleador with predictable ID
     /// </summary>
-    public static async Task<Empleador> GetEmpleadorActivoAsync(IApplicationDbContext context)
+    private static async Task SeedEmpleadorAsync(
+        IApplicationDbContext context, 
+        string userId, 
+        string nombre, 
+        string apellido, 
+        string email,
+        List<PlanEmpleador> planes,
+        List<Empleador> empleadores)
     {
-        var credencial = await context.Credenciales
-            .FirstAsync(c => c.Email.Value == "juan.perez@test.com" && c.Activo);
+        // Crear perfil
+        var perfil = Perfile.CrearPerfilEmpleador(
+            userId: userId,
+            nombre: nombre,
+            apellido: apellido,
+            email: email,
+            telefono1: "809-555-0000");
+        context.Perfiles.Add(perfil);
+        await context.SaveChangesAsync();
 
-        return await context.Empleadores
-            .FirstAsync(e => e.UserId == credencial.UserId);
+        // Crear credencial
+        var credencial = Credencial.Create(
+            userId: userId,
+            email: Domain.ValueObjects.Email.Create(email)!, // Test data has valid emails
+            passwordHash: TestPasswordHash);
+        credencial.Activar(); // Activar la cuenta
+        context.Credenciales.Add(credencial);
+        await context.SaveChangesAsync();
+
+        // Crear empleador
+        var empleador = Empleador.Create(
+            userId: userId,
+            habilidades: "Gestión de proyectos",
+            experiencia: "10 años",
+            descripcion: $"Empleador de prueba {userId}");
+        context.Empleadores.Add(empleador);
+        await context.SaveChangesAsync();
+
+        // Suscripción activa (Plan Profesional)
+        var suscripcion = Suscripcion.Create(
+            userId: userId,
+            planId: planes[1].PlanId, // Plan Profesional
+            duracionMeses: 1);
+        context.Suscripciones.Add(suscripcion);
+        await context.SaveChangesAsync();
+
+        empleadores.Add(empleador);
+    }
+    
+    /// <summary>
+    /// Helper method to seed a single Contratista with predictable ID
+    /// </summary>
+    private static async Task SeedContratistaAsync(
+        IApplicationDbContext context, 
+        string userId, 
+        string nombre, 
+        string apellido, 
+        string email,
+        List<PlanContratista> planesContratistas,
+        List<Contratista> contratistas)
+    {
+        // Crear perfil
+        var perfil = Perfile.CrearPerfilContratista(
+            userId: userId,
+            nombre: nombre,
+            apellido: apellido,
+            email: email,
+            telefono1: "809-555-0000");
+        context.Perfiles.Add(perfil);
+        await context.SaveChangesAsync();
+
+        // Crear credencial
+        var credencial = Credencial.Create(
+            userId: userId,
+            email: Domain.ValueObjects.Email.Create(email)!, // Test data has valid emails
+            passwordHash: TestPasswordHash);
+        credencial.Activar(); // Activar la cuenta
+        context.Credenciales.Add(credencial);
+        await context.SaveChangesAsync();
+
+        // Crear contratista
+        var contratista = Contratista.Create(
+            userId: userId,
+            nombre: nombre,
+            apellido: apellido,
+            tipo: 1, // Persona Física
+            titulo: "Contratista profesional",
+            identificacion: $"ID{userId.Replace("test-contratista-", "")}",
+            sector: "Construcción",
+            experiencia: 5,
+            presentacion: $"Contratista de prueba {userId}",
+            telefono1: "809-555-0000",
+            whatsapp1: true,
+            provincia: "Santo Domingo",
+            nivelNacional: false);
+        context.Contratistas.Add(contratista);
+        await context.SaveChangesAsync();
+
+        // Suscripción activa (Plan Básico)
+        var suscripcion = Suscripcion.Create(
+            userId: userId,
+            planId: planesContratistas[0].PlanId, // Plan Básico
+            duracionMeses: 1);
+        context.Suscripciones.Add(suscripcion);
+        await context.SaveChangesAsync();
+
+        contratistas.Add(contratista);
     }
 
     /// <summary>
-    /// Obtiene el contratista Carlos Rodríguez (activo con plan)
+    /// Obtiene un empleador por userId
     /// </summary>
-    public static async Task<Contratista> GetContratistaActivoAsync(IApplicationDbContext context)
+    public static async Task<Empleador?> GetEmpleadorByUserIdAsync(IApplicationDbContext context, string userId)
     {
-        var credencial = await context.Credenciales
-            .FirstAsync(c => c.Email.Value == "carlos.rodriguez@test.com" && c.Activo);
+        return await context.Empleadores
+            .FirstOrDefaultAsync(e => e.UserId == userId);
+    }
 
+    /// <summary>
+    /// Obtiene un contratista por userId
+    /// </summary>
+    public static async Task<Contratista?> GetContratistaByUserIdAsync(IApplicationDbContext context, string userId)
+    {
         return await context.Contratistas
-            .FirstAsync(c => c.UserId == credencial.UserId);
+            .FirstOrDefaultAsync(c => c.UserId == userId);
     }
 }

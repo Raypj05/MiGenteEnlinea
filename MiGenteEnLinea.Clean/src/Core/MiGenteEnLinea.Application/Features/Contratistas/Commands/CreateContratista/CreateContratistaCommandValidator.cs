@@ -11,7 +11,9 @@ public class CreateContratistaCommandValidator : AbstractValidator<CreateContrat
     {
         RuleFor(x => x.UserId)
             .NotEmpty().WithMessage("UserId es requerido")
-            .Must(BeValidGuid).WithMessage("UserId debe ser un GUID válido");
+            .MaximumLength(100).WithMessage("UserId no puede exceder 100 caracteres");
+            // ✅ REMOVED: Guid validation to support Legacy string userIds (e.g., "test-contratista-201")
+            // Legacy system used simple strings, not GUIDs, for backward compatibility
 
         RuleFor(x => x.Nombre)
             .NotEmpty().WithMessage("Nombre es requerido")
@@ -51,10 +53,5 @@ public class CreateContratistaCommandValidator : AbstractValidator<CreateContrat
         RuleFor(x => x.Provincia)
             .MaximumLength(50).WithMessage("Provincia no puede exceder 50 caracteres")
             .When(x => !string.IsNullOrEmpty(x.Provincia));
-    }
-
-    private bool BeValidGuid(string value)
-    {
-        return Guid.TryParse(value, out _);
     }
 }

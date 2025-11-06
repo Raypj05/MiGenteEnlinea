@@ -56,7 +56,7 @@ public class UtilitariosControllerTests : IClassFixture<TestWebApplicationFactor
         resultado.Should().NotBeNull();
         resultado!.Should().ContainKey("texto");
 
-        var texto = resultado["texto"];
+        var texto = resultado!["texto"]; // Null-forgiving: Already checked NotBeNull above
         texto.Should().Contain("MIL DOSCIENTOS CINCUENTA");
         texto.Should().Contain("PESOS DOMINICANOS");
         texto.Should().Contain("50/100");

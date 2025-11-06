@@ -182,6 +182,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             
             // Aplicar migraciones pendientes
             db.Database.Migrate();
+            
+            // ========================================
+            // PASO 7: Seed initial test data with predictable IDs
+            // ========================================
+            TestDataSeeder.SeedAllAsync(db).GetAwaiter().GetResult();
         });
     }
 

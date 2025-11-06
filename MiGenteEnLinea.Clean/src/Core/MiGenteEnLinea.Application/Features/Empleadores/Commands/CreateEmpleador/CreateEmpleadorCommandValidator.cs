@@ -11,7 +11,9 @@ public sealed class CreateEmpleadorCommandValidator : AbstractValidator<CreateEm
     {
         RuleFor(x => x.UserId)
             .NotEmpty().WithMessage("UserId es requerido")
-            .Must(BeValidGuid).WithMessage("UserId debe ser un GUID válido");
+            .MaximumLength(100).WithMessage("UserId no puede exceder 100 caracteres");
+            // ✅ REMOVED: Guid validation to support Legacy string userIds (e.g., "test-empleador-001")
+            // Legacy system used simple strings, not GUIDs, for backward compatibility
 
         RuleFor(x => x.Habilidades)
             .MaximumLength(200).WithMessage("Habilidades no puede exceder 200 caracteres")
@@ -24,10 +26,5 @@ public sealed class CreateEmpleadorCommandValidator : AbstractValidator<CreateEm
         RuleFor(x => x.Descripcion)
             .MaximumLength(500).WithMessage("Descripcion no puede exceder 500 caracteres")
             .When(x => !string.IsNullOrWhiteSpace(x.Descripcion));
-    }
-
-    private bool BeValidGuid(string userId)
-    {
-        return Guid.TryParse(userId, out _);
     }
 }

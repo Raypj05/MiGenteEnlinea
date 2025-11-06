@@ -130,10 +130,10 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
     // DDD Refactored entity (replaces legacy Empleado)
     public virtual DbSet<Domain.Entities.Empleados.Empleado> Empleados { get; set; }
 
-    // Legacy entity (Generated - no DDD refactoring needed for simple tables)
-    // public virtual DbSet<Remuneracione> Remuneraciones { get; set; } // Legacy entity, commented to avoid EF Core mapping conflict
+    // DDD Refactored entity (replaces legacy Remuneracione)
+    public virtual DbSet<Domain.Entities.Empleados.Remuneracion> Remuneraciones { get; set; }
 
-    // Legacy scaffolded entity (kept for reference)
+    // Legacy scaffolded entity (kept for reference - OBSOLETE, use ReciboDetalle DDD)
     // public virtual DbSet<EmpleadorRecibosDetalle> EmpleadorRecibosDetallesLegacy { get; set; }
 
     // DDD Refactored entity (replaces EmpleadorRecibosDetalle)
@@ -145,7 +145,7 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
     // DDD Refactored entity (replaces legacy EmpleadorRecibosDetalleContratacione)
     public virtual DbSet<Domain.Entities.Pagos.EmpleadorRecibosDetalleContratacione> EmpleadorRecibosDetalleContrataciones { get; set; }
 
-    // Legacy scaffolded entity (kept for reference)
+    // Legacy scaffolded entity (kept for reference - OBSOLETE, use ReciboHeader DDD)
     // public virtual DbSet<EmpleadorRecibosHeader> EmpleadorRecibosHeadersLegacy { get; set; }
 
     // DDD Refactored entity (replaces EmpleadorRecibosHeader)
@@ -163,7 +163,7 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
     // DDD Refactored entity (replaces EmpleadosNota)
     public virtual DbSet<EmpleadoNota> EmpleadosNotas { get; set; }
 
-    // Legacy scaffolded entity (kept for reference)
+    // Legacy scaffolded entity (kept for reference - OBSOLETE, use EmpleadoTemporal DDD)
     // public virtual DbSet<EmpleadosTemporale> EmpleadosTemporalesLegacy { get; set; }
 
     // DDD Refactored entity (replaces EmpleadosTemporale)
@@ -398,7 +398,10 @@ public partial class MiGenteDbContext : IdentityDbContext<ApplicationUser>, IApp
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.PlanesContratista>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.PlanesEmpleadore>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Provincia>();
-        modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Remuneracione>();
+        
+        // ✅ MIGRATED TO DDD: Use Domain.Entities.Empleados.Remuneracion (DDD) instead of Generated.Remuneracione
+        modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Remuneracione>(); // Legacy entity ignored
+        
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Sectore>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Servicio>();
         modelBuilder.Ignore<Infrastructure.Persistence.Entities.Generated.Suscripcione>();

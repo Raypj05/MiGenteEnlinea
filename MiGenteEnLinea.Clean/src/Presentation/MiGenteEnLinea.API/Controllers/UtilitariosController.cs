@@ -114,11 +114,27 @@ public class UtilitariosController : ControllerBase
                 numero,
                 texto);
 
+            // FIX: Retornar numero como string para evitar problemas de deserialización en tests
             return Ok(new
             {
-                numero,
+                numero = numero.ToString("0.##"), // Convert to string with max 2 decimals
                 texto,
                 incluirMoneda
+            });
+        }
+        catch (FluentValidation.ValidationException validationEx)
+        {
+            // FIX: Manejar ValidationException explícitamente para retornar 400
+            _logger.LogWarning(validationEx, "Errores de validación al convertir número: {Numero}", numero);
+            
+            var errors = validationEx.Errors
+                .Select(e => new { field = e.PropertyName, message = e.ErrorMessage })
+                .ToList();
+
+            return BadRequest(new
+            {
+                message = "Errores de validación",
+                errors
             });
         }
         catch (ArgumentOutOfRangeException ex)

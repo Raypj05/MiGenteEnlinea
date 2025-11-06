@@ -46,20 +46,12 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
     /// </summary>
     private async Task SeedTestData()
     {
-        // ⚠️ DESHABILITADO: Cada test debe crear sus propios usuarios con Identity
+        // ⚠️ USUARIOS: Cada test debe crear sus propios usuarios con Identity
         // Esto asegura que el password hashing sea consistente
         
-        // Verificar si ya hay datos (para evitar duplicados entre tests)
-        //var hasData = await AppDbContext.Credenciales.AnyAsync();
-        //if (hasData)
-        //{
-        //    return; // Ya hay datos seeded
-        //}
-        
-        // Ejecutar seeder
-        //await TestDataSeeder.SeedAllAsync(AppDbContext);
-        
-        await Task.CompletedTask;
+        // ✅ CATALOGS: Seed de datos de catálogos (Planes, TSS) que todos los tests necesitan
+        await TestDataSeeder.SeedPlanesAsync(AppDbContext);
+        await TestDataSeeder.SeedDeduccionesTssAsync(AppDbContext);
     }
 
     /// <summary>

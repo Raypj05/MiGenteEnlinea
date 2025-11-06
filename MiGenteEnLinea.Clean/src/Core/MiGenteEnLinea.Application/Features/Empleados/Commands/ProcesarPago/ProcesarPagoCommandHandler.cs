@@ -74,7 +74,7 @@ public class ProcesarPagoCommandHandler : IRequestHandler<ProcesarPagoCommand, i
             ? $"Fracción {request.TipoConcepto} - {request.FechaPago:yyyy-MM-dd}"
             : $"{request.TipoConcepto} - {request.FechaPago:yyyy-MM-dd}";
 
-        var header = ReciboHeader.Create(
+        var header = ReciboHeader.CreateWithOptions(
             userId: request.UserId,
             empleadoId: request.EmpleadoId,
             conceptoPago: conceptoPago,

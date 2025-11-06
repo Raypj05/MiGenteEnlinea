@@ -10,6 +10,10 @@ using MiGenteEnLinea.Application.Features.Empleados.DTOs;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
 using MiGenteEnLinea.Infrastructure.Persistence.Entities.Generated;
 using System.Text;
+using DomainEmpleado = MiGenteEnLinea.Domain.Entities.Empleados.Empleado;
+using DomainRemuneracion = MiGenteEnLinea.Domain.Entities.Empleados.Remuneracion;
+using DomainEmpleadorRecibosHeaderContratacione = MiGenteEnLinea.Domain.Entities.Pagos.EmpleadorRecibosHeaderContratacione;
+using DomainEmpleadorRecibosDetalleContratacione = MiGenteEnLinea.Domain.Entities.Pagos.EmpleadorRecibosDetalleContratacione;
 
 namespace MiGenteEnLinea.Infrastructure.Services;
 
@@ -46,13 +50,13 @@ public class LegacyDataService : ILegacyDataService
         int remuneracionId,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core: Query + Remove + SaveChanges
-        var remuneracion = await _context.Set<Remuneracione>()
+        // ✅ MIGRATED TO DDD: Use Domain.Entities.Empleados.Remuneracion
+        var remuneracion = await _context.Remuneraciones
             .FirstOrDefaultAsync(r => r.UserId == userId && r.Id == remuneracionId, cancellationToken);
 
         if (remuneracion != null)
         {
-            _context.Set<Remuneracione>().Remove(remuneracion);
+            _context.Remuneraciones.Remove(remuneracion);
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
@@ -63,18 +67,19 @@ public class LegacyDataService : ILegacyDataService
         List<RemuneracionItemDto> remuneraciones,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core: AddRange + SaveChanges (batch insert)
-        var entidades = remuneraciones.Select(rem => new Remuneracione
-        {
-            UserId = userId,
-            EmpleadoId = empleadoId,
-            Descripcion = rem.Descripcion,
-            Monto = rem.Monto
-        }).ToList();
+        // ✅ MIGRATED TO DDD: Use factory method Remuneracion.Crear()
+        var entidades = remuneraciones
+            .Select(rem => DomainRemuneracion.Crear(
+                userId: userId,
+                empleadoId: empleadoId,
+                descripcion: rem.Descripcion,
+                monto: rem.Monto
+            ))
+            .ToList();
 
         if (entidades.Any())
         {
-            await _context.Set<Remuneracione>().AddRangeAsync(entidades, cancellationToken);
+            await _context.Remuneraciones.AddRangeAsync(entidades, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
         }
     }
@@ -85,30 +90,31 @@ public class LegacyDataService : ILegacyDataService
         List<RemuneracionItemDto> remuneraciones,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core: Query existing, RemoveRange, AddRange, SaveChanges (single transaction)
+        // ✅ MIGRATED TO DDD: Query existing, RemoveRange, AddRange with factory method, SaveChanges
         // Step 1: Get existing remuneraciones for this empleadoId
-        var existingRemuneraciones = await _context.Set<Remuneracione>()
+        var existingRemuneraciones = await _context.Remuneraciones
             .Where(r => r.UserId == userId && r.EmpleadoId == empleadoId)
             .ToListAsync(cancellationToken);
 
         // Step 2: Remove existing
         if (existingRemuneraciones.Any())
         {
-            _context.Set<Remuneracione>().RemoveRange(existingRemuneraciones);
+            _context.Remuneraciones.RemoveRange(existingRemuneraciones);
         }
 
-        // Step 3: Add new remuneraciones
-        var nuevasEntidades = remuneraciones.Select(rem => new Remuneracione
-        {
-            UserId = userId,
-            EmpleadoId = empleadoId,
-            Descripcion = rem.Descripcion,
-            Monto = rem.Monto
-        }).ToList();
+        // Step 3: Add new remuneraciones using DDD factory method
+        var nuevasEntidades = remuneraciones
+            .Select(rem => DomainRemuneracion.Crear(
+                userId: userId,
+                empleadoId: empleadoId,
+                descripcion: rem.Descripcion,
+                monto: rem.Monto
+            ))
+            .ToList();
 
         if (nuevasEntidades.Any())
         {
-            await _context.Set<Remuneracione>().AddRangeAsync(nuevasEntidades, cancellationToken);
+            await _context.Remuneraciones.AddRangeAsync(nuevasEntidades, cancellationToken);
         }
 
         // Step 4: Save all changes in single transaction
@@ -134,17 +140,13 @@ public class LegacyDataService : ILegacyDataService
         CancellationToken cancellationToken = default)
     {
         // ✅ EF Core: Query + Update properties + SaveChanges
-        var empleado = await _context.Set<Empleado>()
+        var empleado = await _context.Set<DomainEmpleado>()
             .FirstOrDefaultAsync(e => e.EmpleadoId == empleadoId && e.UserId == userId, cancellationToken);
 
         if (empleado == null)
             return false;
 
-        // Update properties (soft delete)
-        empleado.Activo = false;
-        empleado.FechaSalida = fechaBaja.Date; // DateTime? property
-        empleado.MotivoBaja = motivo;
-        empleado.Prestaciones = prestaciones;
+        empleado.DarDeBaja(fechaBaja.Date, motivo, prestaciones);
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -156,14 +158,15 @@ public class LegacyDataService : ILegacyDataService
         int detalleId,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core: Query + Update single property + SaveChanges
-        var detalle = await _context.Set<DetalleContratacione>()
+        // ✅ DDD: Use DDD DbSet (DetalleContrataciones)
+        var detalle = await _context.DetalleContrataciones
             .FirstOrDefaultAsync(d => d.ContratacionId == contratacionId && d.DetalleId == detalleId, cancellationToken);
 
         if (detalle == null)
             return false;
 
-        detalle.Estatus = 3; // Cancelled status
+        // Use DDD method to cancel with default motivo for legacy compatibility
+        detalle.Cancelar("Cancelado por empleador");
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -174,15 +177,15 @@ public class LegacyDataService : ILegacyDataService
         int pagoId,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core: Include Detalle + Remove Header (cascade delete automatic if configured)
-        var header = await _context.Set<EmpleadorRecibosHeader>()
-            .Include(h => h.EmpleadorRecibosDetalles)
+        // ✅ DDD Entity: Use ReciboHeader instead of EmpleadorRecibosHeader legacy
+        var header = await _context.RecibosHeader
+            .Include(h => h.Detalles)
             .FirstOrDefaultAsync(h => h.PagoId == pagoId, cancellationToken);
 
         if (header == null)
             return false;
 
-        _context.Set<EmpleadorRecibosHeader>().Remove(header);
+        _context.RecibosHeader.Remove(header);
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
@@ -192,15 +195,15 @@ public class LegacyDataService : ILegacyDataService
         int pagoId,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core: Include Detalle + Remove Header (cascade delete automatic if configured)
-        var header = await _context.Set<EmpleadorRecibosHeaderContratacione>()
-            .Include(h => h.EmpleadorRecibosDetalleContrataciones)
+        // ✅ DDD: Use DDD DbSet directly (EmpleadorRecibosHeaderContrataciones)
+        // Cascade delete configured in Fluent API will remove detalles automatically
+        var header = await _context.EmpleadorRecibosHeaderContrataciones
             .FirstOrDefaultAsync(h => h.PagoId == pagoId, cancellationToken);
 
         if (header == null)
             return false;
 
-        _context.Set<EmpleadorRecibosHeaderContratacione>().Remove(header);
+        _context.EmpleadorRecibosHeaderContrataciones.Remove(header);
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
@@ -268,27 +271,36 @@ public class LegacyDataService : ILegacyDataService
         int contratacionId,
         CancellationToken cancellationToken = default)
     {
-        // ✅ EF Core OPTIMIZED: Load all entities in one query with Include().ThenInclude()
-        // Then remove in correct order (Detalles → Headers → EmpleadoTemporal)
-        // Single SaveChanges = atomic transaction
-
-        var empleadoTemporal = await _context.Set<EmpleadosTemporale>()
-            .Include(et => et.EmpleadorRecibosHeaderContrataciones)
-                .ThenInclude(h => h.EmpleadorRecibosDetalleContrataciones)
+        // ✅ DDD Entity: Use EmpleadoTemporal (sin navigation property, usa shadow FK)
+        var empleadoTemporal = await _context.EmpleadosTemporales
             .FirstOrDefaultAsync(et => et.ContratacionId == contratacionId, cancellationToken);
 
         if (empleadoTemporal == null)
             return false;
 
-        // Remove all receipts (headers will cascade delete detalles if configured, otherwise explicit)
-        if (empleadoTemporal.EmpleadorRecibosHeaderContrataciones?.Any() == true)
+        // Remove related receipts first (shadow FK relationship)
+        var reciboHeaders = await _context.EmpleadorRecibosHeaderContrataciones
+            .Where(h => h.ContratacionId == contratacionId)
+            .ToListAsync(cancellationToken);
+
+        if (reciboHeaders.Any())
         {
-            _context.Set<EmpleadorRecibosHeaderContratacione>()
-                .RemoveRange(empleadoTemporal.EmpleadorRecibosHeaderContrataciones);
+            // Get all detalles for these headers
+            var pagoIds = reciboHeaders.Select(h => h.PagoId).ToList();
+            var detalles = await _context.EmpleadorRecibosDetalleContrataciones
+                .Where(d => d.PagoId.HasValue && pagoIds.Contains(d.PagoId.Value))
+                .ToListAsync(cancellationToken);
+
+            // Remove in correct order: Detalles first, then Headers
+            if (detalles.Any())
+            {
+                _context.EmpleadorRecibosDetalleContrataciones.RemoveRange(detalles);
+            }
+            _context.EmpleadorRecibosHeaderContrataciones.RemoveRange(reciboHeaders);
         }
 
         // Remove empleadoTemporal
-        _context.Set<EmpleadosTemporale>().Remove(empleadoTemporal);
+        _context.EmpleadosTemporales.Remove(empleadoTemporal);
 
         // Single atomic transaction
         await _context.SaveChangesAsync(cancellationToken);

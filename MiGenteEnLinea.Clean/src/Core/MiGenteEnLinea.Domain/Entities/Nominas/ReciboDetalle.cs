@@ -45,7 +45,44 @@ public sealed class ReciboDetalle : AuditableEntity
     }
 
     /// <summary>
-    /// Crea una nueva línea de detalle para un recibo.
+    /// Crea una nueva línea de detalle para un recibo (sobrecarga simplificada).
+    /// Infiere automáticamente si es ingreso (monto positivo) o deducción (monto negativo).
+    /// </summary>
+    /// <param name="pagoId">ID del recibo header.</param>
+    /// <param name="concepto">Descripción del concepto.</param>
+    /// <param name="monto">Monto del concepto (positivo=ingreso, negativo=deducción).</param>
+    /// <returns>Nueva instancia de ReciboDetalle.</returns>
+    public static ReciboDetalle Create(
+        int pagoId,
+        string concepto,
+        decimal monto)
+    {
+        if (pagoId <= 0)
+            throw new ArgumentException("El ID del pago debe ser mayor a cero", nameof(pagoId));
+
+        if (string.IsNullOrWhiteSpace(concepto))
+            throw new ArgumentException("El concepto es requerido", nameof(concepto));
+
+        if (concepto.Length > 90)
+            throw new ArgumentException("El concepto no puede exceder 90 caracteres", nameof(concepto));
+
+        // Inferir tipo de concepto basado en el signo del monto
+        var tipoConcepto = monto >= 0 ? 1 : 2; // 1=Ingreso, 2=Deducción
+
+        var detalle = new ReciboDetalle
+        {
+            PagoId = pagoId,
+            Concepto = concepto.Trim(),
+            Monto = monto,
+            TipoConcepto = tipoConcepto,
+            Orden = null
+        };
+
+        return detalle;
+    }
+
+    /// <summary>
+    /// Crea una nueva línea de detalle para un recibo con tipo explícito.
     /// </summary>
     /// <param name="pagoId">ID del recibo header.</param>
     /// <param name="concepto">Descripción del concepto.</param>
@@ -53,7 +90,7 @@ public sealed class ReciboDetalle : AuditableEntity
     /// <param name="tipoConcepto">Tipo (1=Ingreso, 2=Deducción).</param>
     /// <param name="orden">Orden de presentación.</param>
     /// <returns>Nueva instancia de ReciboDetalle.</returns>
-    public static ReciboDetalle Create(
+    public static ReciboDetalle CreateWithType(
         int pagoId,
         string concepto,
         decimal monto,
@@ -95,7 +132,7 @@ public sealed class ReciboDetalle : AuditableEntity
         if (monto < 0)
             throw new ArgumentException("El monto de un ingreso no puede ser negativo", nameof(monto));
 
-        return Create(pagoId, concepto, monto, 1, orden);
+        return CreateWithType(pagoId, concepto, monto, 1, orden);
     }
 
     /// <summary>
@@ -106,7 +143,7 @@ public sealed class ReciboDetalle : AuditableEntity
         if (monto < 0)
             throw new ArgumentException("El monto debe especificarse como positivo, se convertirá automáticamente a negativo", nameof(monto));
 
-        return Create(pagoId, concepto, monto, 2, orden);
+        return CreateWithType(pagoId, concepto, monto, 2, orden);
     }
 
     /// <summary>

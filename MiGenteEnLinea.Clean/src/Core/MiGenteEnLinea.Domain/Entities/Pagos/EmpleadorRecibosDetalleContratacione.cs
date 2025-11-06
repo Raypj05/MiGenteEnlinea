@@ -63,6 +63,17 @@ public class EmpleadorRecibosDetalleContratacione : AggregateRoot
     }
 
     /// <summary>
+    /// Crea una nueva línea de detalle para un recibo (sobrecarga simplificada)
+    /// </summary>
+    public static EmpleadorRecibosDetalleContratacione Create(
+        int pagoId,
+        string concepto,
+        decimal monto)
+    {
+        return Crear(pagoId, concepto, monto);
+    }
+
+    /// <summary>
     /// Crea una nueva línea de detalle para un recibo
     /// </summary>
     public static EmpleadorRecibosDetalleContratacione Crear(

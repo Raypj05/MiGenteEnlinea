@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -25,16 +25,14 @@ public class EmpleadosControllerTests : IntegrationTestBase
     #region CreateEmpleado Tests (2 tests)
 
     [Fact]
-    public async Task CreateEmpleado_WithValidData_CreatesEmpleadoAndReturnsId()
+    public async Task CreateEmpleado_WithValidAuth_CreatesEmpleadoAndReturnsId()
     {
-        // Arrange - Register and login as empleador
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsEmpleador(userId: "test-empleador-001");
 
         var command = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-001",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Juan",
             Apellido = "Pérez",
@@ -49,7 +47,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/empleados", command);
+        var response = await client.PostAsJsonAsync("/api/empleados", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -69,8 +67,8 @@ public class EmpleadosControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateEmpleado_WithoutAuthentication_ReturnsUnauthorized()
     {
-        // Arrange - No authentication
-        ClearAuthToken();
+        // Arrange - No JWT token
+        var client = Client.WithoutAuth();
 
         var command = new CreateEmpleadoCommand
         {
@@ -84,7 +82,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/empleados", command);
+        var response = await client.PostAsJsonAsync("/api/empleados", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -95,16 +93,15 @@ public class EmpleadosControllerTests : IntegrationTestBase
     #region GetEmpleado Tests (2 tests)
 
     [Fact]
-    public async Task GetEmpleadoById_WithValidId_ReturnsEmpleadoDetalle()
+    public async Task GetEmpleadoById_WithValidAuth_ReturnsEmpleadoDetalle()
     {
         // Arrange - Create empleado first
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client
+            .AsEmpleador();
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-001",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "María",
             Apellido = "González",
@@ -115,7 +112,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             Tss = true,
             Telefono1 = "8099876543"
         };
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
         
         // Extract empleadoId from response object
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -125,7 +122,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         var empleadoId = idProp.GetInt32();
 
         // Act
-        var response = await Client.GetAsync($"/api/empleados/{empleadoId}");
+        var response = await client.GetAsync($"/api/empleados/{empleadoId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -143,14 +140,13 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task GetEmpleadoById_WithNonExistentId_ReturnsNotFound()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (_, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client
+            .AsEmpleador();
 
         var nonExistentId = 999999;
 
         // Act
-        var response = await Client.GetAsync($"/api/empleados/{nonExistentId}");
+        var response = await client.GetAsync($"/api/empleados/{nonExistentId}");
 
         // Assert - API returns NoContent (204) when empleado not found (valid REST pattern)
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -161,17 +157,16 @@ public class EmpleadosControllerTests : IntegrationTestBase
     #region GetEmpleadosList Tests (2 tests)
 
     [Fact]
-    public async Task GetEmpleadosList_ReturnsListOfEmpleados()
+    public async Task GetEmpleadosList_WithValidAuth_ReturnsListOfEmpleados()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client
+            .AsEmpleador();
 
         // Create at least one empleado
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-003",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Carlos",
             Apellido = "Martínez",
@@ -179,10 +174,10 @@ public class EmpleadosControllerTests : IntegrationTestBase
             Salario = 35000m,
             PeriodoPago = 3
         };
-        await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        await client.PostAsJsonAsync("/api/empleados", createCommand);
 
         // Act - Endpoint correcto: GET /api/empleados (usa userId del token)
-        var response = await Client.GetAsync("/api/empleados");
+        var response = await client.GetAsync("/api/empleados");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -202,15 +197,14 @@ public class EmpleadosControllerTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetEmpleadosActivos_ReturnsOnlyActiveEmpleados()
+    public async Task GetEmpleadosActivos_WithValidAuth_ReturnsOnlyActiveEmpleados()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client
+            .AsEmpleador();
 
         // Act - Endpoint correcto con query parameter
-        var response = await Client.GetAsync("/api/empleados?soloActivos=true");
+        var response = await client.GetAsync("/api/empleados?soloActivos=true");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -234,16 +228,15 @@ public class EmpleadosControllerTests : IntegrationTestBase
     #region UpdateEmpleado Tests (2 tests)
 
     [Fact]
-    public async Task UpdateEmpleado_WithValidData_UpdatesSuccessfully()
+    public async Task UpdateEmpleado_WithValidAuth_UpdatesSuccessfully()
     {
         // Arrange - Create empleado first
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client
+            .AsEmpleador();
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-005",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Ana",
             Apellido = "López",
@@ -253,7 +246,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             PeriodoPago = 3,
             Telefono1 = "8091111111"
         };
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
         
         // Extract empleadoId from response object
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -273,13 +266,13 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/empleados/{empleadoId}", updateCommand);
+        var response = await client.PutAsJsonAsync($"/api/empleados/{empleadoId}", updateCommand);
 
         // Assert - API returns NoContent (204) as valid REST pattern for updates
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify update
-        var getResponse = await Client.GetAsync($"/api/empleados/{empleadoId}");
+        var getResponse = await client.GetAsync($"/api/empleados/{empleadoId}");
         var updatedEmpleado = await getResponse.Content.ReadFromJsonAsync<EmpleadoDetalleDto>();
         updatedEmpleado.Should().NotBeNull();
         updatedEmpleado!.Posicion.Should().Be("Gerente de Ventas");
@@ -290,8 +283,8 @@ public class EmpleadosControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleado_WithoutAuthentication_ReturnsUnauthorized()
     {
-        // Arrange - No authentication
-        ClearAuthToken();
+        // Arrange - No JWT token
+        var client = Client.WithoutAuth();
 
         var updateCommand = new UpdateEmpleadoCommand
         {
@@ -300,7 +293,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PutAsJsonAsync("/api/empleados/123", updateCommand);
+        var response = await client.PutAsJsonAsync("/api/empleados/123", updateCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -311,16 +304,15 @@ public class EmpleadosControllerTests : IntegrationTestBase
     #region DarDeBajaEmpleado Tests (2 tests)
 
     [Fact]
-    public async Task DarDeBajaEmpleado_WithValidData_InactivatesEmpleado()
+    public async Task DarDeBajaEmpleado_WithValidAuth_InactivatesEmpleado()
     {
         // Arrange - Create empleado first
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client
+            .AsEmpleador();
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-006",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Pedro",
             Apellido = "Ramírez",
@@ -328,7 +320,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             Salario = 40000m,
             PeriodoPago = 3
         };
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
         
         // Extract empleadoId from response object
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -346,7 +338,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act - Endpoint correcto: PUT /api/empleados/{empleadoId}/dar-de-baja
-        var response = await Client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
+        var response = await client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -364,8 +356,8 @@ public class EmpleadosControllerTests : IntegrationTestBase
     [Fact]
     public async Task DarDeBajaEmpleado_WithoutAuthentication_ReturnsUnauthorized()
     {
-        // Arrange - No authentication
-        ClearAuthToken();
+        // Arrange - No JWT token
+        var client = Client.WithoutAuth();
 
         var bajaRequest = new
         {
@@ -375,7 +367,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act - Endpoint correcto: PUT /api/empleados/{empleadoId}/dar-de-baja
-        var response = await Client.PutAsJsonAsync("/api/empleados/123/dar-de-baja", bajaRequest);
+        var response = await client.PutAsJsonAsync("/api/empleados/123/dar-de-baja", bajaRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -389,13 +381,11 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task CreateEmpleado_WithInvalidCedula_ReturnsBadRequest()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-005");
 
         var command = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-005",
             Identificacion = "123", // Invalid: too short
             Nombre = "Test",
             Apellido = "User",
@@ -405,7 +395,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/empleados", command);
+        var response = await client.PostAsJsonAsync("/api/empleados", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -415,13 +405,11 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task CreateEmpleado_WithNegativeSalary_ReturnsBadRequest()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-006");
 
         var command = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-006",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Test",
             Apellido = "User",
@@ -431,7 +419,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/empleados", command);
+        var response = await client.PostAsJsonAsync("/api/empleados", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -445,14 +433,12 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task DarDeBajaEmpleado_VerifiesSoftDelete_SetsActivoFalseAndPopulatesDates()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-007");
 
         // Create empleado
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-007",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Pedro",
             Apellido = "Martinez",
@@ -461,7 +447,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             PeriodoPago = 2
         };
 
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -479,11 +465,11 @@ public class EmpleadosControllerTests : IntegrationTestBase
             Motivo = "Fin contrato" // Shortened to avoid DB truncation (motivoBaja column limit)
         };
 
-        var bajaResponse = await Client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
+        var bajaResponse = await client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
         bajaResponse.EnsureSuccessStatusCode();
 
         // Assert: Verify soft delete by getting empleado again
-        var getResponse = await Client.GetAsync($"/api/empleados/{empleadoId}");
+        var getResponse = await client.GetAsync($"/api/empleados/{empleadoId}");
         
         if (getResponse.StatusCode == HttpStatusCode.OK)
         {
@@ -529,9 +515,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task DarDeBajaEmpleado_WithNonExistentId_ReturnsNotFound()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-008");
 
         var nonExistentId = 999999;
         var bajaRequest = new
@@ -542,7 +526,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/empleados/{nonExistentId}/dar-de-baja", bajaRequest);
+        var response = await client.PutAsJsonAsync($"/api/empleados/{nonExistentId}/dar-de-baja", bajaRequest);
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
@@ -552,14 +536,12 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task DarDeBajaEmpleado_WithFutureFechaBaja_ReturnsBadRequest()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-009");
 
         // Create empleado
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userId,
+            UserId = "test-empleador-009",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Luis",
             Apellido = "Gomez",
@@ -568,7 +550,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             PeriodoPago = 3
         };
 
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -585,7 +567,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             Motivo = "Test futuro"
         };
 
-        var response = await Client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
+        var response = await client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
 
         // Assert: Should return BadRequest for future date
         // Note: This test will pass if validation is implemented, otherwise skip
@@ -604,13 +586,11 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task UpdateEmpleado_FromDifferentUser_ReturnsForbidden()
     {
         // Arrange: Create empleado as User A
-        var emailA = GenerateUniqueEmail("empleadorA");
-        var (userIdA, registeredEmailA) = await RegisterUserAsync(emailA, "Password123!", "Empleador", "TestA", "CompanyA");
-        await LoginAsync(registeredEmailA, "Password123!");
+        var clientA = Client.AsEmpleador(userId: "test-empleador-userA");
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userIdA,
+            UserId = "test-empleador-userA",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Carlos",
             Apellido = "Rodriguez",
@@ -619,7 +599,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             PeriodoPago = 2
         };
 
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await clientA.PostAsJsonAsync("/api/empleados", createCommand);
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -628,26 +608,21 @@ public class EmpleadosControllerTests : IntegrationTestBase
         if (!hasId) hasId = createJson.TryGetProperty("EmpleadoId", out idProp);
         var empleadoId = idProp.GetInt32();
 
-        // Logout User A
-        ClearAuthToken();
-
-        // Login as User B (different user)
-        var emailB = GenerateUniqueEmail("empleadorB");
-        var (userIdB, registeredEmailB) = await RegisterUserAsync(emailB, "Password123!", "Empleador", "TestB", "CompanyB");
-        await LoginAsync(registeredEmailB, "Password123!");
+        // Switch to User B (different user)
+        var clientB = Client.AsEmpleador(userId: "test-empleador-userB");
 
         // Act: Try to update User A's empleado as User B
         var updateCommand = new UpdateEmpleadoCommand
         {
             EmpleadoId = empleadoId,
-            UserId = userIdB, // Different user trying to update
+            UserId = "test-empleador-userB", // Different user trying to update
             Nombre = "Hacked",
             Apellido = "Name",
             Salario = 99999m,
             PeriodoPago = 1
         };
 
-        var response = await Client.PutAsJsonAsync($"/api/empleados/{empleadoId}", updateCommand);
+        var response = await clientB.PutAsJsonAsync($"/api/empleados/{empleadoId}", updateCommand);
 
         // Assert: Should be Forbidden (or NotFound if API doesn't expose existence)
         response.StatusCode.Should().BeOneOf(
@@ -661,13 +636,11 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task DarDeBajaEmpleado_FromDifferentUser_ReturnsForbidden()
     {
         // Arrange: Create empleado as User A
-        var emailA = GenerateUniqueEmail("empleadorA");
-        var (userIdA, registeredEmailA) = await RegisterUserAsync(emailA, "Password123!", "Empleador", "TestA", "CompanyA");
-        await LoginAsync(registeredEmailA, "Password123!");
+        var clientA = Client.AsEmpleador(userId: "test-empleador-userC");
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = userIdA,
+            UserId = "test-empleador-userC",
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Ana",
             Apellido = "Martinez",
@@ -676,7 +649,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             PeriodoPago = 3
         };
 
-        var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+        var createResponse = await clientA.PostAsJsonAsync("/api/empleados", createCommand);
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var createContent = await createResponse.Content.ReadAsStringAsync();
@@ -685,13 +658,8 @@ public class EmpleadosControllerTests : IntegrationTestBase
         if (!hasId) hasId = createJson.TryGetProperty("EmpleadoId", out idProp);
         var empleadoId = idProp.GetInt32();
 
-        // Logout User A
-        ClearAuthToken();
-
-        // Login as User B (different user)
-        var emailB = GenerateUniqueEmail("empleadorB");
-        var (userIdB, registeredEmailB) = await RegisterUserAsync(emailB, "Password123!", "Empleador", "TestB", "CompanyB");
-        await LoginAsync(registeredEmailB, "Password123!");
+        // Switch to User B (different user)
+        var clientB = Client.AsEmpleador(userId: "test-empleador-userD");
 
         // Act: Try to dar de baja User A's empleado as User B
         var bajaRequest = new
@@ -719,9 +687,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task GetEmpleados_WithSearchTerm_ReturnsFilteredResults()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-010");
 
         // Create multiple empleados with different names
         var empleados = new[]
@@ -736,7 +702,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
         {
             var createCommand = new CreateEmpleadoCommand
             {
-                UserId = userId,
+                UserId = "test-empleador-010",
                 Identificacion = GenerateRandomIdentification(),
                 Nombre = emp.Nombre,
                 Apellido = emp.Apellido,
@@ -745,12 +711,12 @@ public class EmpleadosControllerTests : IntegrationTestBase
                 PeriodoPago = 2
             };
 
-            var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+            var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
             createResponse.EnsureSuccessStatusCode();
         }
 
         // Act: Search for "Roberto"
-        var response = await Client.GetAsync("/api/empleados?searchTerm=Roberto");
+        var response = await client.GetAsync("/api/empleados?searchTerm=Roberto");
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -794,16 +760,14 @@ public class EmpleadosControllerTests : IntegrationTestBase
     public async Task GetEmpleados_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Test", "Company");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-011");
 
         // Create 15 empleados for pagination testing
         for (int i = 1; i <= 15; i++)
         {
             var createCommand = new CreateEmpleadoCommand
             {
-                UserId = userId,
+                UserId = "test-empleador-011",
                 Identificacion = GenerateRandomIdentification(),
                 Nombre = $"Empleado{i:D2}",
                 Apellido = $"Test{i:D2}",
@@ -812,12 +776,12 @@ public class EmpleadosControllerTests : IntegrationTestBase
                 PeriodoPago = 2
             };
 
-            var createResponse = await Client.PostAsJsonAsync("/api/empleados", createCommand);
+            var createResponse = await client.PostAsJsonAsync("/api/empleados", createCommand);
             createResponse.EnsureSuccessStatusCode();
         }
 
         // Act: Request page 1 with pageSize=10
-        var response = await Client.GetAsync("/api/empleados?pageIndex=1&pageSize=10");
+        var response = await client.GetAsync("/api/empleados?pageIndex=1&pageSize=10");
 
         // Assert
         response.EnsureSuccessStatusCode();

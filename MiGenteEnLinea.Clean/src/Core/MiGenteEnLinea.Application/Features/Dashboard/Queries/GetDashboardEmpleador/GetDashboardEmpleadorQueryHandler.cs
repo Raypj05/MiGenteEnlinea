@@ -9,14 +9,16 @@ namespace MiGenteEnLinea.Application.Features.Dashboard.Queries.GetDashboardEmpl
 /// Handler para obtener las métricas del dashboard del empleador.
 /// </summary>
 /// <remarks>
-/// Este handler ejecuta múltiples queries en paralelo para optimizar performance:
+/// Este handler ejecuta múltiples queries secuencialmente:
 /// 1. Métricas de empleados (activos/inactivos)
 /// 2. Métricas de nómina (mes/año)
 /// 3. Información de suscripción
 /// 4. Actividad reciente (recibos, contrataciones, calificaciones)
 /// 5. Historial de pagos
+/// 6. Gráficos (evolución, deducciones, distribución)
 /// 
 /// IMPORTANTE: Los resultados deben cachearse (5-15 min) para evitar queries costosas en cada request.
+/// TODO: Considerar IDbContextFactory para permitir queries paralelas sin threading issues.
 /// </remarks>
 public class GetDashboardEmpleadorQueryHandler : IRequestHandler<GetDashboardEmpleadorQuery, DashboardEmpleadorDto>
 {
@@ -44,30 +46,20 @@ public class GetDashboardEmpleadorQueryHandler : IRequestHandler<GetDashboardEmp
 
         try
         {
-            // Ejecutar queries en paralelo para mejor performance
-            var empleadosTask = ObtenerMetricasEmpleados(request.UserId, cancellationToken);
-            var nominaTask = ObtenerMetricasNomina(request.UserId, inicioMes, finMes, inicioAno, fechaReferencia, cancellationToken);
-            var suscripcionTask = ObtenerInfoSuscripcion(request.UserId, fechaReferencia, cancellationToken);
-            var actividadTask = ObtenerMetricasActividad(request.UserId, inicioMes, finMes, cancellationToken);
-            var pagosTask = ObtenerUltimosPagos(request.UserId, cancellationToken);
+            // NOTA: Ejecutar queries secuencialmente para evitar threading issues con DbContext
+            // EF Core no permite múltiples operaciones concurrentes en la misma instancia
+            // TODO: Considerar usar IDbContextFactory para queries paralelas en el futuro
+            
+            var empleados = await ObtenerMetricasEmpleados(request.UserId, cancellationToken);
+            var nomina = await ObtenerMetricasNomina(request.UserId, inicioMes, finMes, inicioAno, fechaReferencia, cancellationToken);
+            var suscripcion = await ObtenerInfoSuscripcion(request.UserId, fechaReferencia, cancellationToken);
+            var actividad = await ObtenerMetricasActividad(request.UserId, inicioMes, finMes, cancellationToken);
+            var pagos = await ObtenerUltimosPagos(request.UserId, cancellationToken);
             
             // Queries para gráficos
-            var evolucionTask = ObtenerEvolucionNomina(request.UserId, fechaReferencia, cancellationToken);
-            var deduccionesTask = ObtenerTopDeducciones(request.UserId, cancellationToken);
-            var distribucionTask = ObtenerDistribucionEmpleados(request.UserId, cancellationToken);
-
-            await Task.WhenAll(
-                empleadosTask, nominaTask, suscripcionTask, actividadTask, pagosTask,
-                evolucionTask, deduccionesTask, distribucionTask);
-
-            var empleados = await empleadosTask;
-            var nomina = await nominaTask;
-            var suscripcion = await suscripcionTask;
-            var actividad = await actividadTask;
-            var pagos = await pagosTask;
-            var evolucion = await evolucionTask;
-            var deducciones = await deduccionesTask;
-            var distribucion = await distribucionTask;
+            var evolucion = await ObtenerEvolucionNomina(request.UserId, fechaReferencia, cancellationToken);
+            var deducciones = await ObtenerTopDeducciones(request.UserId, cancellationToken);
+            var distribucion = await ObtenerDistribucionEmpleados(request.UserId, cancellationToken);
 
             var dashboard = new DashboardEmpleadorDto
             {

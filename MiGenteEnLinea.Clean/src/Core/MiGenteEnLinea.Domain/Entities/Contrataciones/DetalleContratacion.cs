@@ -102,13 +102,14 @@ public sealed class DetalleContratacion : AggregateRoot
     /// </summary>
     public int PorcentajeAvance { get; private set; }
 
-    // Constantes de estado
-    private const int ESTADO_PENDIENTE = 1;
-    private const int ESTADO_ACEPTADA = 2;
-    private const int ESTADO_EN_PROGRESO = 3;
-    private const int ESTADO_COMPLETADA = 4;
-    private const int ESTADO_CANCELADA = 5;
-    private const int ESTADO_RECHAZADA = 6;
+    // Constantes de estado (valores Legacy para compatibilidad DB)
+    // ⚠️ CRITICAL: These values MUST match database values from Legacy system
+    private const int ESTADO_PENDIENTE = 1;      // Propuesta enviada
+    private const int ESTADO_ACEPTADA = 2;       // Contratista aceptó
+    private const int ESTADO_CANCELADA = 3;      // ✅ FIX: Was 5, should be 3 (Legacy value)
+    private const int ESTADO_COMPLETADA = 4;     // Trabajo finalizado
+    private const int ESTADO_EN_PROGRESO = 5;    // ✅ FIX: Was 3, should be 5 (Legacy value)
+    private const int ESTADO_RECHAZADA = 6;      // Contratista rechazó
 
     // Constructor privado para EF Core
     private DetalleContratacion() { }

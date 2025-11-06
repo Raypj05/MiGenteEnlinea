@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using FluentValidation;
 using MiGenteEnLinea.Application.Common.Exceptions;
@@ -64,7 +66,7 @@ public class GlobalExceptionHandlerMiddleware
             context.User?.Identity?.Name ?? "Anonymous");
 
         // Map exception to HTTP status code
-        var (statusCode, message, details) = MapException(exception);
+        var (statusCode, message, details, errors) = MapException(exception);
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
@@ -77,13 +79,15 @@ public class GlobalExceptionHandlerMiddleware
             Details = _env.IsDevelopment() ? details : null, // Only show details in Development
             TraceId = context.TraceIdentifier,
             Path = context.Request.Path.ToString(),
-            Timestamp = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow,
+            Errors = errors
         };
 
         var json = JsonSerializer.Serialize(response, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = _env.IsDevelopment()
+            WriteIndented = _env.IsDevelopment(),
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         });
 
         await context.Response.WriteAsync(json);
@@ -92,7 +96,7 @@ public class GlobalExceptionHandlerMiddleware
     /// <summary>
     /// Maps exceptions to HTTP status codes and messages.
     /// </summary>
-    private (HttpStatusCode statusCode, string message, string? details) MapException(Exception exception)
+    private (HttpStatusCode statusCode, string message, string? details, List<ValidationError>? errors) MapException(Exception exception)
     {
         return exception switch
         {
@@ -100,7 +104,8 @@ public class GlobalExceptionHandlerMiddleware
             NotFoundException notFound => (
                 HttpStatusCode.NotFound,
                 notFound.Message,
-                _env.IsDevelopment() ? notFound.StackTrace : null
+                _env.IsDevelopment() ? notFound.StackTrace : null,
+                null
             ),
 
             // FluentValidation exceptions (from ValidationBehavior)
@@ -109,33 +114,40 @@ public class GlobalExceptionHandlerMiddleware
                 "Ocurrieron uno o más errores de validación.",
                 _env.IsDevelopment() 
                     ? string.Join("; ", fluentValidation.Errors.Select(e => $"{e.PropertyName}: {e.ErrorMessage}"))
-                    : null
+                    : null,
+                fluentValidation.Errors
+                    .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
+                    .ToList()
             ),
 
             // Application ValidationException
             AppValidationException validation => (
                 HttpStatusCode.BadRequest,
                 validation.Message,
-                _env.IsDevelopment() ? validation.StackTrace : null
+                _env.IsDevelopment() ? validation.StackTrace : null,
+                null
             ),
 
             BadRequestException badRequest => (
                 HttpStatusCode.BadRequest,
                 badRequest.Message,
-                _env.IsDevelopment() ? badRequest.StackTrace : null
+                _env.IsDevelopment() ? badRequest.StackTrace : null,
+                null
             ),
 
             // Security exceptions
             UnauthorizedAccessException unauthorized => (
                 HttpStatusCode.Unauthorized,
                 unauthorized.Message,
-                _env.IsDevelopment() ? unauthorized.StackTrace : null
+                _env.IsDevelopment() ? unauthorized.StackTrace : null,
+                null
             ),
 
             ForbiddenAccessException forbidden => (
                 HttpStatusCode.Forbidden,
                 forbidden.Message,
-                _env.IsDevelopment() ? forbidden.StackTrace : null
+                _env.IsDevelopment() ? forbidden.StackTrace : null,
+                null
             ),
 
             // Catch-all for unexpected errors
@@ -144,7 +156,8 @@ public class GlobalExceptionHandlerMiddleware
                 _env.IsDevelopment() 
                     ? exception.Message 
                     : "Ha ocurrido un error interno. Por favor, contacte al administrador.",
-                _env.IsDevelopment() ? exception.StackTrace : null
+                _env.IsDevelopment() ? exception.StackTrace : null,
+                null
             )
         };
     }
@@ -161,4 +174,7 @@ public class ErrorResponse
     public string TraceId { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; }
+    public List<ValidationError>? Errors { get; set; }
 }
+
+public sealed record ValidationError(string Field, string Message);

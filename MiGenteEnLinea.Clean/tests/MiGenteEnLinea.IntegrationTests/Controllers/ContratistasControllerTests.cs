@@ -30,21 +30,19 @@ public class ContratistasControllerTests : IntegrationTestBase
         // Este test debe verificar que el perfil existe después del registro,
         // NO intentar crear uno nuevo (causaría error "perfil ya existe")
         
-        // Arrange - Register and login as contratista
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Pedro", "García");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-201");
 
         // Act - Get the auto-created contratista profile (by userId)
-        var response = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var response = await client.GetAsync($"/api/contratistas/by-user/test-contratista-201");
 
         // Assert - Profile should exist
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var contratistaDto = await response.Content.ReadFromJsonAsync<ContratistaDto>();
         contratistaDto.Should().NotBeNull();
-        contratistaDto!.UserId.Should().Be(userId);
-        contratistaDto.Nombre.Should().Be("Pedro");
-        contratistaDto.Apellido.Should().Be("García");
+        contratistaDto!.UserId.Should().Be("test-contratista-201");
+        contratistaDto.Nombre.Should().Be("Test");
+        contratistaDto.Apellido.Should().Be("User");
         contratistaDto.ContratistaId.Should().BeGreaterThan(0);
     }
 
@@ -52,16 +50,16 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task CreateContratista_WithoutAuthentication_ReturnsUnauthorized()
     {
         // Arrange - No authentication token
-        ClearAuthToken();
+        var client = Client.WithoutAuth();
 
         var command = new CreateContratistaCommand(
-            UserId: "some-user-id",
+            UserId: "test-contratista-202",
             Nombre: "Test",
             Apellido: "User"
         );
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/contratistas", command);
+        var response = await client.PostAsJsonAsync("/api/contratistas", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -77,28 +75,26 @@ public class ContratistasControllerTests : IntegrationTestBase
         // ✅ FIX: GAP-010 - RegisterCommand auto-creates Contratista
         // Get the auto-created profile instead of creating a new one
         
-        // Arrange - Register, login
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "María", "López");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-203");
 
         // Get the auto-created contratista to obtain contratistaId
-        var byUserResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var byUserResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-203");
         byUserResponse.EnsureSuccessStatusCode();
         var createdProfile = await byUserResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         var contratistaId = createdProfile!.ContratistaId;
 
         // Act - Get by contratistaId
-        var response = await Client.GetAsync($"/api/contratistas/{contratistaId}");
+        var response = await client.GetAsync($"/api/contratistas/{contratistaId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var contratistaDto = await response.Content.ReadFromJsonAsync<ContratistaDto>();
         contratistaDto.Should().NotBeNull();
         contratistaDto!.ContratistaId.Should().Be(contratistaId);
-        contratistaDto.UserId.Should().Be(userId);
-        contratistaDto.Nombre.Should().Be("María");
-        contratistaDto.Apellido.Should().Be("López");
+        contratistaDto.UserId.Should().Be("test-contratista-203");
+        contratistaDto.Nombre.Should().Be("Test");
+        contratistaDto.Apellido.Should().Be("User");
     }
 
     #endregion
@@ -108,13 +104,11 @@ public class ContratistasControllerTests : IntegrationTestBase
     [Fact]
     public async Task GetContratistasList_ReturnsListOfContratistas()
     {
-        // Arrange - Register and login
-        var email = GenerateUniqueEmail("contratista");
-        var (_, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Carlos", "Martínez");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-204");
 
         // Act
-        var response = await Client.GetAsync("/api/contratistas");
+        var response = await client.GetAsync("/api/contratistas");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -143,17 +137,15 @@ public class ContratistasControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateContratista_WithValidData_UpdatesSuccessfully()
     {
-        // Arrange - Register, login, and create contratista
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Ana", "Rodríguez");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-205");
 
         // ✅ FIX: No need to create profile (already auto-created)
         // Just update the existing profile
         
         // Update contratista
         var updateCommand = new UpdateContratistaCommand(
-            UserId: userId,
+            UserId: "test-contratista-205",
             Titulo: "Carpintera profesional certificada",
             Sector: "Carpintería y Ebanistería",
             Experiencia: 7,
@@ -166,13 +158,13 @@ public class ContratistasControllerTests : IntegrationTestBase
         );
 
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId}", updateCommand);
+        var response = await client.PutAsJsonAsync($"/api/contratistas/test-contratista-205", updateCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify update - Get by userId
-        var getResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var getResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-205");
         var updatedContratista = await getResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         updatedContratista.Should().NotBeNull();
         updatedContratista!.Titulo.Should().Be("Carpintera profesional certificada");
@@ -188,15 +180,15 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task UpdateContratista_WithoutAuthentication_ReturnsUnauthorized()
     {
         // Arrange - No authentication token
-        ClearAuthToken();
+        var client = Client.WithoutAuth();
 
         var updateCommand = new UpdateContratistaCommand(
-            UserId: "some-user-id",
+            UserId: "test-contratista-206",
             Titulo: "Test title"
         );
 
         // Act
-        var response = await Client.PutAsJsonAsync("/api/contratistas/123", updateCommand);
+        var response = await client.PutAsJsonAsync("/api/contratistas/123", updateCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -209,24 +201,22 @@ public class ContratistasControllerTests : IntegrationTestBase
     [Fact]
     public async Task DesactivarPerfil_WithValidUserId_DeactivatesSuccessfully()
     {
-        // Arrange - Register and login as contratista
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Luis", "Fernández");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-207");
 
         // Verify profile is initially active
-        var initialResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var initialResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-207");
         var initialProfile = await initialResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         initialProfile!.Activo.Should().BeTrue("Profile should be active after registration");
 
         // Act - Deactivate profile
-        var response = await Client.PostAsync($"/api/contratistas/{userId}/desactivar", null);
+        var response = await client.PostAsync($"/api/contratistas/test-contratista-207/desactivar", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify profile is now inactive
-        var verifyResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var verifyResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-207");
         var deactivatedProfile = await verifyResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         deactivatedProfile!.Activo.Should().BeFalse("Profile should be inactive after desactivar");
     }
@@ -234,27 +224,25 @@ public class ContratistasControllerTests : IntegrationTestBase
     [Fact]
     public async Task ActivarPerfil_AfterDesactivar_ActivatesSuccessfully()
     {
-        // Arrange - Register, login, and deactivate profile
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Roberto", "Gómez");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-208");
 
         // Deactivate first
-        await Client.PostAsync($"/api/contratistas/{userId}/desactivar", null);
+        await client.PostAsync($"/api/contratistas/test-contratista-208/desactivar", null);
 
         // Verify it's deactivated
-        var deactivatedResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var deactivatedResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-208");
         var deactivatedProfile = await deactivatedResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         deactivatedProfile!.Activo.Should().BeFalse();
 
         // Act - Reactivate profile
-        var response = await Client.PostAsync($"/api/contratistas/{userId}/activar", null);
+        var response = await client.PostAsync($"/api/contratistas/test-contratista-208/activar", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify profile is active again
-        var verifyResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var verifyResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-208");
         var activatedProfile = await verifyResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         activatedProfile!.Activo.Should().BeTrue("Profile should be active after activar");
     }
@@ -262,15 +250,13 @@ public class ContratistasControllerTests : IntegrationTestBase
     [Fact]
     public async Task DesactivarPerfil_WithNonExistentUserId_ReturnsNotFound()
     {
-        // Arrange - Login as any user (needed for authentication)
-        var email = GenerateUniqueEmail("contratista");
-        var (_, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "User");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-209");
 
         var nonExistentUserId = Guid.NewGuid().ToString();
 
         // Act
-        var response = await Client.PostAsync($"/api/contratistas/{nonExistentUserId}/desactivar", null);
+        var response = await client.PostAsync($"/api/contratistas/{nonExistentUserId}/desactivar", null);
 
         // Assert
         // ✅ FIXED (Oct 30, 2025): Changed InvalidOperationException to NotFoundException
@@ -299,23 +285,17 @@ public class ContratistasControllerTests : IntegrationTestBase
         // that reads actual claims from JWT tokens instead of returning hardcoded values
         
         // Arrange - Create two users
-        var email1 = GenerateUniqueEmail("contratista1");
-        var (userId1, registeredEmail1) = await RegisterUserAsync(email1, "Password123!", "Contratista", "User", "One");
+        var client1 = Client.AsContratista(userId: "test-contratista-userG");
+        var client2 = Client.AsContratista(userId: "test-contratista-userH");
 
-        var email2 = GenerateUniqueEmail("contratista2");
-        var (userId2, registeredEmail2) = await RegisterUserAsync(email2, "Password123!", "Contratista", "User", "Two");
-
-        // Login as user2
-        await LoginAsync(registeredEmail2, "Password123!");
-
-        // Try to update user1's profile
+        // Try to update user1's profile as user2
         var updateCommand = new UpdateContratistaCommand(
-            UserId: userId1, // ❌ Trying to update different user's profile
+            UserId: "test-contratista-userG", // ❌ Trying to update different user's profile
             Titulo: "Hacker intentando actualizar otro perfil"
         );
 
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId1}", updateCommand);
+        var response = await client2.PutAsJsonAsync($"/api/contratistas/test-contratista-userG", updateCommand);
 
         // Assert
         // Expected: 403 Forbidden (with real CurrentUserService)
@@ -331,12 +311,10 @@ public class ContratistasControllerTests : IntegrationTestBase
         // (Legacy behavior - all users get Contratista profile)
         
         // Arrange - Register as Empleador (tipo = 1)
-        var email = GenerateUniqueEmail("empleador");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Empleador", "Juan", "Pérez");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-501");
 
         // Act - Try to get Contratista profile
-        var response = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var response = await client.GetAsync($"/api/contratistas/by-user/test-empleador-501");
 
         // Assert - Should exist (auto-created by GAP-010)
         response.StatusCode.Should().Be(HttpStatusCode.OK, 
@@ -344,18 +322,18 @@ public class ContratistasControllerTests : IntegrationTestBase
         
         var contratistaDto = await response.Content.ReadFromJsonAsync<ContratistaDto>();
         contratistaDto.Should().NotBeNull();
-        contratistaDto!.UserId.Should().Be(userId);
+        contratistaDto!.UserId.Should().Be("test-empleador-501");
     }
 
     [Fact]
     public async Task DesactivarPerfil_WithoutAuthentication_ReturnsUnauthorized()
     {
         // Arrange - No authentication
-        ClearAuthToken();
+        var client = Client.WithoutAuth();
         var someUserId = Guid.NewGuid().ToString();
 
         // Act
-        var response = await Client.PostAsync($"/api/contratistas/{someUserId}/desactivar", null);
+        var response = await client.PostAsync($"/api/contratistas/{someUserId}/desactivar", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -370,33 +348,29 @@ public class ContratistasControllerTests : IntegrationTestBase
     {
         // Arrange - Create multiple contratistas with different profiles
         // User 1: Plomero en Santo Domingo
-        var email1 = GenerateUniqueEmail("plomero");
-        var (userId1, registeredEmail1) = await RegisterUserAsync(email1, "Password123!", "Contratista", "Carlos", "Fontanero");
-        await LoginAsync(registeredEmail1, "Password123!");
+        var client1 = Client.AsContratista(userId: "test-contratista-210");
         
         var updateCommand1 = new UpdateContratistaCommand(
-            UserId: userId1,
+            UserId: "test-contratista-210",
             Sector: "Plomería",
             Provincia: "Santo Domingo",
             Experiencia: 5
         );
-        await Client.PutAsJsonAsync($"/api/contratistas/{userId1}", updateCommand1);
+        await client1.PutAsJsonAsync($"/api/contratistas/test-contratista-210", updateCommand1);
 
         // User 2: Electricista en Santiago
-        var email2 = GenerateUniqueEmail("electricista");
-        var (userId2, registeredEmail2) = await RegisterUserAsync(email2, "Password123!", "Contratista", "Ana", "Electrica");
-        await LoginAsync(registeredEmail2, "Password123!");
+        var client2 = Client.AsContratista(userId: "test-contratista-211");
         
         var updateCommand2 = new UpdateContratistaCommand(
-            UserId: userId2,
+            UserId: "test-contratista-211",
             Sector: "Electricidad",
             Provincia: "Santiago",
             Experiencia: 8
         );
-        await Client.PutAsJsonAsync($"/api/contratistas/{userId2}", updateCommand2);
+        await client2.PutAsJsonAsync($"/api/contratistas/test-contratista-211", updateCommand2);
 
         // Act - Search with sector filter (should return electricista)
-        var response = await Client.GetAsync("/api/contratistas?sector=Electricidad&pageIndex=1&pageSize=10");
+        var response = await client1.GetAsync("/api/contratistas?sector=Electricidad&pageIndex=1&pageSize=10");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -413,13 +387,11 @@ public class ContratistasControllerTests : IntegrationTestBase
     [Fact]
     public async Task SearchContratistas_WithPagination_ReturnsPagedResults()
     {
-        // Arrange - Login as any user
-        var email = GenerateUniqueEmail("contratista");
-        var (_, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "Pagination");
-        await LoginAsync(registeredEmail, "Password123!");
+        // Arrange
+        var client = Client.AsContratista(userId: "test-contratista-212");
 
         // Act - Search with pagination parameters
-        var response = await Client.GetAsync("/api/contratistas?pageIndex=1&pageSize=5");
+        var response = await client.GetAsync("/api/contratistas?pageIndex=1&pageSize=5");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -440,18 +412,16 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task AddServicio_WithValidData_CreatesSuccessfully()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Juan", "Servicios");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-213");
         
-        var profileResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var profileResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-213");
         var profile = await profileResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         var contratistaId = profile!.ContratistaId;
         
         var addServicioRequest = new { detalleServicio = "Instalación eléctrica" };
         
         // Act
-        var response = await Client.PostAsJsonAsync($"/api/contratistas/{contratistaId}/servicios", addServicioRequest);
+        var response = await client.PostAsJsonAsync($"/api/contratistas/{contratistaId}/servicios", addServicioRequest);
         
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -469,19 +439,17 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task GetServiciosContratista_ReturnsListOfServicios()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Ana", "Servicios");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-214");
         
-        var profileResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var profileResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-214");
         var profile = await profileResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         var contratistaId = profile!.ContratistaId;
         
         var addServicioRequest = new { detalleServicio = "Reparación eléctrica" };
-        await Client.PostAsJsonAsync($"/api/contratistas/{contratistaId}/servicios", addServicioRequest);
+        await client.PostAsJsonAsync($"/api/contratistas/{contratistaId}/servicios", addServicioRequest);
         
         // Act
-        var response = await Client.GetAsync($"/api/contratistas/{contratistaId}/servicios");
+        var response = await client.GetAsync($"/api/contratistas/{contratistaId}/servicios");
         
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -499,16 +467,14 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task RemoveServicio_WithValidId_RemovesSuccessfully()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Carlos", "Remove");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-215");
         
-        var profileResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var profileResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-215");
         var profile = await profileResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         var contratistaId = profile!.ContratistaId;
         
         var addServicioRequest = new { detalleServicio = "Servicio temporal" };
-        var addResponse = await Client.PostAsJsonAsync($"/api/contratistas/{contratistaId}/servicios", addServicioRequest);
+        var addResponse = await client.PostAsJsonAsync($"/api/contratistas/{contratistaId}/servicios", addServicioRequest);
         var addResult = await addResponse.Content.ReadFromJsonAsync<JsonElement>();
         
         // Try both camelCase and PascalCase
@@ -519,7 +485,7 @@ public class ContratistasControllerTests : IntegrationTestBase
         var servicioId = idProp.GetInt32();
         
         // Act
-        var response = await Client.DeleteAsync($"/api/contratistas/{contratistaId}/servicios/{servicioId}");
+        var response = await client.DeleteAsync($"/api/contratistas/{contratistaId}/servicios/{servicioId}");
         
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -529,18 +495,16 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task RemoveServicio_WithNonExistentId_ReturnsNotFound()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "Remove");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-216");
         
-        var profileResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var profileResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-216");
         var profile = await profileResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         var contratistaId = profile!.ContratistaId;
         
         var nonExistentServicioId = 99999;
         
         // Act
-        var response = await Client.DeleteAsync($"/api/contratistas/{contratistaId}/servicios/{nonExistentServicioId}");
+        var response = await client.DeleteAsync($"/api/contratistas/{contratistaId}/servicios/{nonExistentServicioId}");
         
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -554,21 +518,19 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task UpdateContratistaImagen_WithValidUrl_UpdatesSuccessfully()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "Imagen");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-217");
         
         var imageUrl = "https://example.com/profile-photo.jpg";
         var request = new { ImagenUrl = imageUrl };
         
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId}/imagen", request);
+        var response = await client.PutAsJsonAsync($"/api/contratistas/test-contratista-217/imagen", request);
         
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         // Verify image was updated
-        var profileResponse = await Client.GetAsync($"/api/contratistas/by-user/{userId}");
+        var profileResponse = await client.GetAsync($"/api/contratistas/by-user/test-contratista-217");
         var profile = await profileResponse.Content.ReadFromJsonAsync<ContratistaDto>();
         profile!.ImagenUrl.Should().Be(imageUrl);
     }
@@ -577,14 +539,12 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task UpdateContratistaImagen_WithEmptyUrl_ReturnsValidationError()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "EmptyImg");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-218");
         
         var request = new { ImagenUrl = "" };
         
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId}/imagen", request);
+        var response = await client.PutAsJsonAsync($"/api/contratistas/test-contratista-218/imagen", request);
         
         // Assert
         // Empty URL might be valid (to clear image) or invalid depending on business rules
@@ -598,25 +558,14 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task GetCedulaByUserId_ReturnsCorrectCedula()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var cedula = "40212345678"; // Test cedula
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "Cedula");
-        await LoginAsync(registeredEmail, "Password123!");
-        
-        // ✅ FIX: RegisterUserAsync no longer accepts cedula parameter
-        // Need to update the profile with cedula after registration
-        var updateData = new
-        {
-            Sector = "Tecnología" // At least one field is required
-        };
-        await Client.PutAsJsonAsync($"/api/contratistas/{userId}", updateData);
+        var client = Client.AsContratista(userId: "test-contratista-219");
         
         // ✅ NOTE: GetCedulaByUserId returns cedula from Credencial table, not Contratista profile
         // The cedula is NOT set during registration (RegisterCommand doesn't include it)
         // This endpoint might return 404 if cedula is not set in Credencial table
         
         // Act
-        var response = await Client.GetAsync($"/api/contratistas/cedula/{userId}");
+        var response = await client.GetAsync($"/api/contratistas/cedula/test-contratista-219");
         
         // Assert
         // ⚠️ EXPECTED: 404 because cedula is not set during registration
@@ -635,9 +584,7 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task UpdateContratista_TituloExceedsMaxLength_ReturnsValidationError()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "LongTitle");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-220");
         
         var tituloTooLong = new string('A', 71); // Max is 70
         var updateData = new
@@ -646,7 +593,7 @@ public class ContratistasControllerTests : IntegrationTestBase
         };
         
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId}", updateData);
+        var response = await client.PutAsJsonAsync($"/api/contratistas/test-contratista-220", updateData);
         
         // Assert
         // ✅ FluentValidation might return 500 if an exception is thrown during validation
@@ -669,9 +616,7 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task UpdateContratista_PresentacionExceedsMaxLength_ReturnsValidationError()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "LongPresent");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-221");
         
         var presentacionTooLong = new string('B', 251); // Max is 250
         var updateData = new
@@ -680,7 +625,7 @@ public class ContratistasControllerTests : IntegrationTestBase
         };
         
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId}", updateData);
+        var response = await client.PutAsJsonAsync($"/api/contratistas/test-contratista-221", updateData);
         
         // Assert
         // ✅ Same as TituloExceedsMaxLength - accept 400 or 500 until validation pipeline is fixed
@@ -699,17 +644,9 @@ public class ContratistasControllerTests : IntegrationTestBase
     public async Task UpdateContratista_WithNoFieldsProvided_ReturnsValidationError()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        var (userId, registeredEmail) = await RegisterUserAsync(email, "Password123!", "Contratista", "Test", "NoFields");
-        await LoginAsync(registeredEmail, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-222");
         
-        // ✅ FIX: Empty JSON object `{}` will deserialize with all properties as null/default
-        // The validator checks: "all properties are null" → should fail
-        // However, the API controller might accept it as valid input
-        // The UpdateContratistaCommand allows all fields to be optional (null)
-        // The validator's "Must provide at least one field" rule might not catch empty JSON
-        
-        // Test with truly empty command (all explicit nulls)
+        // ✅ Test empty command (all fields null) - should be rejected by validator
         var updateData = new
         {
             Titulo = (string?)null,
@@ -726,31 +663,16 @@ public class ContratistasControllerTests : IntegrationTestBase
         };
         
         // Act
-        var response = await Client.PutAsJsonAsync($"/api/contratistas/{userId}", updateData);
+        var response = await client.PutAsJsonAsync($"/api/contratistas/test-contratista-222", updateData);
         
         // Assert
-        // ✅ EXPECTED BEHAVIOR: The validator should catch this and return 400
-        // ⚠️ ACTUAL BEHAVIOR (from test): Returns 200 OK
-        // This suggests the validator's "at least one field" check is not working correctly
-        // Possible causes:
-        // 1. The validator checks (property != null) but JSON deserialization sets all to null
-        // 2. The command handler doesn't call validator (unlikely with MediatR pipeline)
-        // 3. The validator condition logic is inverted
+        // ✅ CORRECT BEHAVIOR: Validator properly rejects empty updates with 400 BadRequest
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, 
+            "El validador debe rechazar actualizaciones sin ningún campo proporcionado");
         
-        // For now, let's document this as a BUG and adjust test expectation
-        // ⚠️ BUG: UpdateContratista accepts empty updates (no fields provided)
-        // Expected: 400 BadRequest with "Debe proporcionar al menos un campo para actualizar"
-        // Actual: 200 OK
-        
-        // Temporary fix: Accept current behavior until validator is fixed
-        response.StatusCode.Should().Be(HttpStatusCode.OK, 
-            "⚠️ BUG: API currently accepts empty updates. Should return 400 BadRequest.");
-        
-        // TODO: Fix UpdateContratistaCommandValidator to properly reject empty updates
-        // When fixed, change assertion to:
-        // response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        // var content = await response.Content.ReadAsStringAsync();
-        // content.Should().Contain("Debe proporcionar al menos un campo para actualizar");
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("al menos un campo", 
+            "El mensaje debe indicar que se requiere al menos un campo para actualizar");
     }
 
     #endregion

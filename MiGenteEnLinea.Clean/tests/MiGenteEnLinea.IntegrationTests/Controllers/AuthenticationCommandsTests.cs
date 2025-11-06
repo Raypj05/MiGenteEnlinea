@@ -667,12 +667,12 @@ public class AuthenticationCommandsTests : IntegrationTestBase
     {
         // Arrange
         var email = $"change-pwd-id-{Guid.NewGuid()}@test.com";
-        var oldPassword = "Old123!";
-        var newPassword = "New456!";
-        var (userId, _) = await CreateTestUserAsync(email, oldPassword, isActive: true);
+        var oldPassword = "OldPass123!"; // ✅ Strong password
+        var newPassword = "NewPass456!"; // ✅ Strong password
+        var (userId, actualEmail) = await CreateTestUserAsync(email, oldPassword, isActive: true);
 
-        // Get credencial ID
-        var emailVO = Email.CreateUnsafe(email);
+        // Get credencial ID using actual email returned (might be different due to unique suffix)
+        var emailVO = Email.CreateUnsafe(actualEmail);
         var credencial = await AppDbContext.Credenciales
             .FirstOrDefaultAsync(c => c.Email == emailVO);
         credencial.Should().NotBeNull();
@@ -692,8 +692,8 @@ public class AuthenticationCommandsTests : IntegrationTestBase
         result.Should().NotBeNull();
         result!["message"].Should().Contain("cambiada");
 
-        // Verify can login with new password
-        var token = await GetAuthTokenAsync(email, newPassword);
+        // Verify can login with new password using actual email
+        var token = await GetAuthTokenAsync(actualEmail, newPassword);
         token.Should().NotBeNullOrEmpty();
 
         // Verify old password doesn't work

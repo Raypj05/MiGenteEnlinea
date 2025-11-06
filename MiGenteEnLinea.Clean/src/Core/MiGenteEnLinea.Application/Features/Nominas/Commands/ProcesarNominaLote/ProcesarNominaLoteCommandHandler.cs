@@ -106,7 +106,7 @@ public class ProcesarNominaLoteCommandHandler : IRequestHandler<ProcesarNominaLo
                 decimal neto = ingresos - deducciones;
 
                 // Crear ReciboHeader usando factory method con firmas correctas
-                var reciboHeader = ReciboHeader.Create(
+                var reciboHeader = ReciboHeader.CreateWithOptions(
                     userId: empleador.UserId,
                     empleadoId: empleadoItem.EmpleadoId,
                     conceptoPago: $"Nómina {request.Periodo}",

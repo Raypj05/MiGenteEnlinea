@@ -16,9 +16,8 @@ public class DarDeBajaEmpleadoCommandValidator : AbstractValidator<DarDeBajaEmpl
 
         RuleFor(x => x.FechaBaja)
             .NotEmpty()
-            .WithMessage("La fecha de baja es requerida")
-            .LessThanOrEqualTo(DateTime.Now)
-            .WithMessage("La fecha de baja no puede ser futura");
+            .WithMessage("La fecha de baja es requerida");
+            // Removed .LessThanOrEqualTo(DateTime.Now) to allow programmed terminations (future dates)
 
         RuleFor(x => x.Prestaciones)
             .GreaterThanOrEqualTo(0)

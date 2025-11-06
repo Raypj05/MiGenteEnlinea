@@ -54,22 +54,22 @@ public class UpdateRemuneracionesCommandHandler : IRequestHandler<UpdateRemunera
             request.EmpleadoId,
             request.UserId);
 
-        // PASO 1: Eliminar remuneración existente
-        // ⚠️ PARIDAD LEGACY CON BUG: Solo elimina la primera (FirstOrDefault)
-        // Legacy: var result = db.Remuneraciones.Where(x => x.empleadoID == empleadoID).FirstOrDefault();
-        var existingRemuneracion = await _context.Set<Remuneracion>()
+        // PASO 1: ✅ CORREGIDO - Eliminar TODAS las remuneraciones existentes (no solo primera)
+        // ⚠️ LEGACY BUG: Usaba FirstOrDefault() (solo eliminaba primera)
+        // ✅ FIX: Usar ToListAsync() para eliminar todas
+        var existingRemuneraciones = await _context.Remuneraciones
             .Where(r => r.EmpleadoId == request.EmpleadoId)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (existingRemuneracion != null)
+        if (existingRemuneraciones.Any())
         {
             _logger.LogInformation(
-                "Eliminando remuneración existente Id: {Id} para EmpleadoId: {EmpleadoId}",
-                existingRemuneracion.Id,
+                "Eliminando {Count} remuneraciones existentes para EmpleadoId: {EmpleadoId}",
+                existingRemuneraciones.Count,
                 request.EmpleadoId);
 
-            // Legacy: db.Remuneraciones.Remove(result); db.SaveChanges();
-            _context.Set<Remuneracion>().Remove(existingRemuneracion);
+            // ✅ RemoveRange para eliminar todas (no solo Remove para una)
+            _context.Remuneraciones.RemoveRange(existingRemuneraciones);
         }
         else
         {
@@ -95,7 +95,7 @@ public class UpdateRemuneracionesCommandHandler : IRequestHandler<UpdateRemunera
             request.EmpleadoId);
 
         // PASO 3: Batch insert (Legacy: db1.Remuneraciones.AddRange(rem))
-        await _context.Set<Remuneracion>().AddRangeAsync(nuevasRemuneraciones, cancellationToken);
+        await _context.Remuneraciones.AddRangeAsync(nuevasRemuneraciones, cancellationToken);
 
         // PASO 4: SaveChanges UNA SOLA VEZ (transacción atómica)
         // Nota: Legacy hace SaveChanges 2 veces (una en cada DbContext)

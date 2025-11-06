@@ -78,6 +78,37 @@ public class EmpleadorRecibosHeaderContratacione : AggregateRoot
     }
 
     /// <summary>
+    /// Crea un nuevo recibo de pago pendiente (sobrecarga simplificada con fecha de pago)
+    /// Permite fechas históricas para importación de datos legacy.
+    /// </summary>
+    public static EmpleadorRecibosHeaderContratacione Create(
+        int contratacionId,
+        string userId,
+        DateTime fechaPago,
+        string conceptoPago)
+    {
+        var recibo = new EmpleadorRecibosHeaderContratacione(userId, contratacionId, conceptoPago, 1);
+        
+        // Para fechas históricas (importación legacy), establecer FechaRegistro = FechaPago
+        // Esto evita validación que rechaza fechas pasadas
+        if (fechaPago < DateTime.UtcNow)
+        {
+            recibo.FechaRegistro = fechaPago;
+        }
+        
+        recibo.FechaPago = fechaPago; // Asignar directamente sin validación estricta
+
+        recibo.RaiseDomainEvent(new ReciboContratacionCreadoEvent(
+            recibo.PagoId,
+            recibo.UserId,
+            recibo.ContratacionId,
+            recibo.ConceptoPago,
+            recibo.Tipo));
+
+        return recibo;
+    }
+
+    /// <summary>
     /// Crea un nuevo recibo de pago pendiente
     /// </summary>
     public static EmpleadorRecibosHeaderContratacione Crear(

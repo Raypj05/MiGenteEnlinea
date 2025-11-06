@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using MiGenteEnLinea.Application.Features.Suscripciones.Commands.CreateSuscripcion;
 using MiGenteEnLinea.Application.Features.Suscripciones.DTOs;
@@ -25,32 +26,33 @@ public class SuscripcionesControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateSuscripcion_WithValidData_CreatesSubscriptionAndReturnsId()
     {
-        // Arrange - Register and login
-        var email = GenerateUniqueEmail("empleador");
-        var userId = await RegisterUserAsync(email, "Password123!", "Empresa", "Test", "Empleador");
-        await LoginAsync(email, "Password123!");
+        // Arrange
+        var client = Client.AsEmpleador(userId: "test-empleador-301");
 
         var command = new CreateSuscripcionCommand
         {
-            UserId = userId.ToString(),
+            UserId = "test-empleador-301",
             PlanId = 1, // Assuming plan 1 exists (should be seeded)
             FechaInicio = DateTime.UtcNow
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/suscripciones", command);
+        var response = await client.PostAsJsonAsync("/api/suscripciones", command);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var suscripcionId = await response.Content.ReadFromJsonAsync<int>();
+        // ✅ API returns 201 Created (REST best practice) not 200 OK
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        result.TryGetProperty("suscripcionId", out var suscripcionIdProp).Should().BeTrue();
+        var suscripcionId = suscripcionIdProp.GetInt32();
         suscripcionId.Should().BeGreaterThan(0);
     }
 
     [Fact]
     public async Task CreateSuscripcion_WithoutAuthentication_ReturnsUnauthorized()
     {
-        // Arrange - No authentication
-        ClearAuthToken();
+        // Arrange
+        var client = Client.WithoutAuth();
 
         var command = new CreateSuscripcionCommand
         {
@@ -59,7 +61,7 @@ public class SuscripcionesControllerTests : IntegrationTestBase
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/suscripciones", command);
+        var response = await client.PostAsJsonAsync("/api/suscripciones", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -72,27 +74,25 @@ public class SuscripcionesControllerTests : IntegrationTestBase
     [Fact]
     public async Task GetSuscripcionByUserId_WithValidUserId_ReturnsSuscripcion()
     {
-        // Arrange - Create subscription first
-        var email = GenerateUniqueEmail("empleador");
-        var userId = await RegisterUserAsync(email, "Password123!", "Empresa", "Test", "Empleador");
-        await LoginAsync(email, "Password123!");
+        // Arrange
+        var client = Client.AsEmpleador(userId: "test-empleador-302");
 
         var createCommand = new CreateSuscripcionCommand
         {
-            UserId = userId.ToString(),
+            UserId = "test-empleador-302",
             PlanId = 1,
             FechaInicio = DateTime.UtcNow
         };
-        await Client.PostAsJsonAsync("/api/suscripciones", createCommand);
+        await client.PostAsJsonAsync("/api/suscripciones", createCommand);
 
-        // Act
-        var response = await Client.GetAsync($"/api/suscripciones/by-user/{userId}");
+        // Act - Use correct endpoint: /api/suscripciones/activa/{userId}
+        var response = await client.GetAsync($"/api/suscripciones/activa/test-empleador-302");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var suscripcion = await response.Content.ReadFromJsonAsync<SuscripcionDto>();
         suscripcion.Should().NotBeNull();
-        suscripcion!.UserId.Should().Be(userId.ToString());
+        suscripcion!.UserId.Should().Be("test-empleador-302");
         suscripcion.PlanId.Should().Be(1);
         suscripcion.EstaActiva.Should().BeTrue();
     }
@@ -101,14 +101,12 @@ public class SuscripcionesControllerTests : IntegrationTestBase
     public async Task GetSuscripcionByUserId_WithNonExistentUser_ReturnsNotFound()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        await RegisterUserAsync(email, "Password123!", "Empresa", "Test", "Empleador");
-        await LoginAsync(email, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-303");
 
         var nonExistentUserId = 999999;
 
-        // Act
-        var response = await Client.GetAsync($"/api/suscripciones/by-user/{nonExistentUserId}");
+        // Act - Use correct endpoint: /api/suscripciones/activa/{userId}
+        var response = await client.GetAsync($"/api/suscripciones/activa/{nonExistentUserId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -122,12 +120,10 @@ public class SuscripcionesControllerTests : IntegrationTestBase
     public async Task GetPlanesEmpleadores_ReturnsListOfPlans()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        await RegisterUserAsync(email, "Password123!", "Empresa", "Test", "Empleador");
-        await LoginAsync(email, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-304");
 
-        // Act
-        var response = await Client.GetAsync("/api/planes/empleadores");
+        // Act - Use correct endpoint: /api/suscripciones/planes/empleadores
+        var response = await client.GetAsync("/api/suscripciones/planes/empleadores");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -141,12 +137,10 @@ public class SuscripcionesControllerTests : IntegrationTestBase
     public async Task GetPlanesContratistas_ReturnsListOfPlans()
     {
         // Arrange
-        var email = GenerateUniqueEmail("contratista");
-        await RegisterUserAsync(email, "Password123!", "Pedro", "García", "Contratista");
-        await LoginAsync(email, "Password123!");
+        var client = Client.AsContratista(userId: "test-contratista-305");
 
-        // Act
-        var response = await Client.GetAsync("/api/planes/contratistas");
+        // Act - Use correct endpoint: /api/suscripciones/planes/contratistas
+        var response = await client.GetAsync("/api/suscripciones/planes/contratistas");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -164,42 +158,40 @@ public class SuscripcionesControllerTests : IntegrationTestBase
     public async Task CreateSuscripcion_WithInvalidPlanId_ReturnsBadRequest()
     {
         // Arrange
-        var email = GenerateUniqueEmail("empleador");
-        var userId = await RegisterUserAsync(email, "Password123!", "Empresa", "Test", "Empleador");
-        await LoginAsync(email, "Password123!");
+        var client = Client.AsEmpleador(userId: "test-empleador-306");
 
         var command = new CreateSuscripcionCommand
         {
-            UserId = userId.ToString(),
+            UserId = "test-empleador-306",
             PlanId = 99999, // Invalid plan ID
             FechaInicio = DateTime.UtcNow
         };
 
         // Act
-        var response = await Client.PostAsJsonAsync("/api/suscripciones", command);
+        var response = await client.PostAsJsonAsync("/api/suscripciones", command);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // ✅ API throws NotFoundException (404) when PlanId doesn't exist
+        // This is correct REST behavior - resource not found
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task GetSuscripcionActiva_WhenExpired_ReturnsInactiveStatus()
     {
-        // Arrange - Create subscription with past expiration date
-        var email = GenerateUniqueEmail("empleador");
-        var userId = await RegisterUserAsync(email, "Password123!", "Empresa", "Test", "Empleador");
-        await LoginAsync(email, "Password123!");
+        // Arrange
+        var client = Client.AsEmpleador(userId: "test-empleador-307");
 
         var createCommand = new CreateSuscripcionCommand
         {
-            UserId = userId.ToString(),
+            UserId = "test-empleador-307",
             PlanId = 1,
             FechaInicio = DateTime.UtcNow.AddMonths(-2) // Started 2 months ago
         };
-        await Client.PostAsJsonAsync("/api/suscripciones", createCommand);
+        await client.PostAsJsonAsync("/api/suscripciones", createCommand);
 
-        // Act
-        var response = await Client.GetAsync($"/api/suscripciones/by-user/{userId}");
+        // Act - Use correct endpoint: /api/suscripciones/activa/{userId}
+        var response = await client.GetAsync($"/api/suscripciones/activa/test-empleador-307");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);

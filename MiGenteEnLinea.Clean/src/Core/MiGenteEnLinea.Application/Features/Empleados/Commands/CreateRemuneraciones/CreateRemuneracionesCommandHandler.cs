@@ -1,7 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
 using MiGenteEnLinea.Application.Common.Interfaces;
-using MiGenteEnLinea.Domain.Entities.Empleados;
 
 namespace MiGenteEnLinea.Application.Features.Empleados.Commands.CreateRemuneraciones;
 
@@ -10,15 +9,14 @@ namespace MiGenteEnLinea.Application.Features.Empleados.Commands.CreateRemunerac
 /// Implementa guardarOtrasRemuneraciones() del Legacy (EmpleadosService.cs línea 646-654).
 /// </summary>
 /// <remarks>
-/// ESTRATEGIA DDD:
-/// - Usa Remuneracion.Crear() factory method para cada item
-/// - Valida cada remuneración mediante factory (lanza excepciones si inválido)
-/// - Batch insert con AddRange() para mejor performance
+/// ESTRATEGIA: Usa ILegacyDataService para acceder a tabla Remuneraciones (entidad legacy no migrada a DDD)
+/// - Batch insert con mejor performance
 /// - Logging estructurado
+/// - Valida datos en DTO validator
 /// 
 /// DIFERENCIAS CON LEGACY:
 /// - Legacy: Sin validaciones (asume datos válidos)
-/// - Clean: Validaciones en factory method
+/// - Clean: Validaciones en FluentValidation
 /// - Legacy: No logging
 /// - Clean: Logging estructurado en cada paso
 /// 
@@ -28,14 +26,14 @@ namespace MiGenteEnLinea.Application.Features.Empleados.Commands.CreateRemunerac
 /// </remarks>
 public class CreateRemuneracionesCommandHandler : IRequestHandler<CreateRemuneracionesCommand, bool>
 {
-    private readonly IApplicationDbContext _context;
+    private readonly ILegacyDataService _legacyDataService;
     private readonly ILogger<CreateRemuneracionesCommandHandler> _logger;
 
     public CreateRemuneracionesCommandHandler(
-        IApplicationDbContext context,
+        ILegacyDataService legacyDataService,
         ILogger<CreateRemuneracionesCommandHandler> logger)
     {
-        _context = context;
+        _legacyDataService = legacyDataService;
         _logger = logger;
     }
 
@@ -47,31 +45,17 @@ public class CreateRemuneracionesCommandHandler : IRequestHandler<CreateRemunera
             request.EmpleadoId,
             request.UserId);
 
-        // PASO 1: Crear entidades usando DDD factory method
-        var remuneraciones = request.Remuneraciones
-            .Select(dto => Remuneracion.Crear(
-                userId: request.UserId,
-                empleadoId: request.EmpleadoId,
-                descripcion: dto.Descripcion,
-                monto: dto.Monto
-            ))
-            .ToList();
-
-        _logger.LogInformation(
-            "Entidades Remuneracion creadas exitosamente: {Count}",
-            remuneraciones.Count);
-
-        // PASO 2: Batch insert (Legacy: db.Remuneraciones.AddRange(rem))
-        await _context.Set<Remuneracion>().AddRangeAsync(remuneraciones, cancellationToken);
-
-        // PASO 3: SaveChanges (Legacy: db.SaveChanges())
-        await _context.SaveChangesAsync(cancellationToken);
+        // Delegar a LegacyDataService que maneja la entidad legacy Remuneracione
+        await _legacyDataService.CreateRemuneracionesAsync(
+            request.UserId,
+            request.EmpleadoId,
+            request.Remuneraciones,
+            cancellationToken);
 
         _logger.LogInformation(
             "Remuneraciones guardadas exitosamente para EmpleadoId: {EmpleadoId}",
             request.EmpleadoId);
 
-        // PASO 4: Return true (Legacy parity)
         return true;
     }
 }

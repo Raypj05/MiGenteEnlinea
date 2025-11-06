@@ -27,6 +27,12 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     public Mock<IPaymentService> PaymentServiceMock { get; private set; } = new();
     public Mock<IPadronService> PadronServiceMock { get; private set; } = new();
 
+    public TestWebApplicationFactory()
+    {
+        // Inicializar JwtTokenGenerator al crear la factory
+        // Esto se hace después de que la configuración esté cargada
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Configurar environment como Testing
@@ -36,6 +42,10 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Cargar appsettings.Testing.json
             config.AddJsonFile("appsettings.Testing.json", optional: false, reloadOnChange: false);
+            
+            // Inicializar JwtTokenGenerator con la configuración cargada
+            var configuration = config.Build();
+            JwtTokenGenerator.Initialize(configuration);
         });
 
         builder.ConfigureServices((context, services) =>

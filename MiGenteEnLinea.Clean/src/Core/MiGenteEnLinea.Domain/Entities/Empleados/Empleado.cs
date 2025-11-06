@@ -412,14 +412,25 @@ public sealed class Empleado : AggregateRoot
     /// </summary>
     public void Desactivar(string motivoBaja, decimal? prestaciones = null)
     {
+        DarDeBaja(DateTime.UtcNow, motivoBaja, prestaciones);
+    }
+
+    /// <summary>
+    /// Desactiva el empleado estableciendo una fecha de salida explícita.
+    /// </summary>
+    public void DarDeBaja(DateTime fechaBaja, string motivoBaja, decimal? prestaciones = null)
+    {
         if (!Activo)
             throw new InvalidOperationException("El empleado ya está inactivo");
+
+        if (fechaBaja == default)
+            throw new ArgumentException("La fecha de baja es requerida", nameof(fechaBaja));
 
         if (string.IsNullOrWhiteSpace(motivoBaja))
             throw new ArgumentException("El motivo de baja es requerido", nameof(motivoBaja));
 
         Activo = false;
-        FechaSalida = DateTime.UtcNow;
+        FechaSalida = fechaBaja;
         MotivoBaja = motivoBaja.Trim();
         Prestaciones = prestaciones;
 

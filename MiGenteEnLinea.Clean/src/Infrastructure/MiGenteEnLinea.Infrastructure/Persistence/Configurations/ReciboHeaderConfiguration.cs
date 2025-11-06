@@ -103,8 +103,8 @@ public sealed class ReciboHeaderConfiguration : IEntityTypeConfiguration<ReciboH
             .IsUnicode(false)
             .IsRequired(false);
 
-        // Relaciones
-        builder.HasMany<ReciboDetalle>()
+        // Relaciones - Configurar navegación Detalles para soporte de Include()
+        builder.HasMany(r => r.Detalles)
             .WithOne()
             .HasForeignKey(d => d.PagoId)
             .OnDelete(DeleteBehavior.Cascade);
@@ -131,8 +131,7 @@ public sealed class ReciboHeaderConfiguration : IEntityTypeConfiguration<ReciboH
         builder.HasIndex(r => new { r.EmpleadoId, r.FechaRegistro })
             .HasDatabaseName("IX_ReciboHeader_EmpleadoId_FechaRegistro");
 
-        // Ignorar propiedades calculadas y eventos
+        // Ignorar eventos de dominio
         builder.Ignore(r => r.Events);
-        builder.Ignore(r => r.Detalles);
     }
 }

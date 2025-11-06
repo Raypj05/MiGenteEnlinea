@@ -27,6 +27,7 @@ public interface IApplicationDbContext
     DbSet<Domain.Entities.Contratistas.ContratistaServicio> ContratistasServicios { get; }
     DbSet<Domain.Entities.Empleadores.Empleador> Empleadores { get; }
     DbSet<Domain.Entities.Empleados.Empleado> Empleados { get; }
+    DbSet<Domain.Entities.Empleados.Remuneracion> Remuneraciones { get; }
     DbSet<Domain.Entities.Nominas.ReciboHeader> RecibosHeader { get; }
     DbSet<Domain.Entities.Nominas.ReciboDetalle> RecibosDetalle { get; }
     DbSet<Domain.Entities.Nominas.DeduccionTss> DeduccionesTss { get; }

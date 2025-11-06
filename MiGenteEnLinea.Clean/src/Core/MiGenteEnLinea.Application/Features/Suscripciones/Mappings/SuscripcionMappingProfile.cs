@@ -22,6 +22,7 @@ public class SuscripcionMappingProfile : Profile
             .ForMember(dest => dest.IncluyeNomina, opt => opt.MapFrom(src => src.IncluyeNomina));
 
         CreateMap<PlanContratista, PlanDto>()
+            .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => src.NombrePlan))
             .ForMember(dest => dest.TipoPlan, opt => opt.MapFrom(src => "Contratista"))
             .ForMember(dest => dest.LimiteEmpleados, opt => opt.MapFrom(src => (int?)null))
             .ForMember(dest => dest.MesesHistorico, opt => opt.MapFrom(src => (int?)null))

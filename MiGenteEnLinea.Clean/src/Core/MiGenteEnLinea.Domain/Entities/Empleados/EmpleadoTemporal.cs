@@ -113,6 +113,20 @@ public sealed class EmpleadoTemporal : AggregateRoot
     }
 
     /// <summary>
+    /// Crea una contratación temporal de persona física (sobrecarga simplificada).
+    /// Alias para CreatePersonaFisica para compatibilidad con código legacy.
+    /// </summary>
+    public static EmpleadoTemporal Create(
+        string userId,
+        string nombre,
+        string apellido,
+        string identificacion,
+        string? telefono = null)
+    {
+        return CreatePersonaFisica(userId, identificacion, nombre, apellido, telefono);
+    }
+
+    /// <summary>
     /// Crea una contratación temporal de persona física.
     /// </summary>
     public static EmpleadoTemporal CreatePersonaFisica(

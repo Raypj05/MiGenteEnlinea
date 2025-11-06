@@ -5,6 +5,7 @@ using MiGenteEnLinea.Domain.Entities.Empleadores;
 using MiGenteEnLinea.Domain.Entities.Contratistas;
 using MiGenteEnLinea.Domain.Entities.Seguridad;
 using MiGenteEnLinea.Domain.Entities.Authentication;
+using MiGenteEnLinea.Domain.Entities.Nominas;
 using MiGenteEnLinea.Infrastructure.Persistence.Contexts;
 using MiGenteEnLinea.Infrastructure.Identity;
 using MiGenteEnLinea.Application.Common.Interfaces;
@@ -61,7 +62,7 @@ public static class TestDataSeeder
     }
 
     /// <summary>
-    /// Seed completo: Planes + Usuarios (Empleadores y Contratistas)
+    /// Seed completo: Planes + Usuarios (Empleadores y Contratistas) + Deducciones TSS
     /// </summary>
     public static async Task SeedAllAsync(IApplicationDbContext context)
     {
@@ -70,6 +71,8 @@ public static class TestDataSeeder
         Console.WriteLine($"🔍 DEBUG TestDataSeeder: TestPasswordHash Length = {TestPasswordHash.Length}");
         
         await SeedPlanesAsync(context);
+        await SeedPlanesContratistasAsync(context);
+        await SeedDeduccionesTssAsync(context);
         await SeedUsuariosAsync(context);
     }
 
@@ -110,6 +113,64 @@ public static class TestDataSeeder
         context.PlanesEmpleadores.AddRange(planes);
         await context.SaveChangesAsync();
         return planes;
+    }
+
+    /// <summary>
+    /// Crea planes de suscripción para Contratistas
+    /// Los contratistas son proveedores de servicios que buscan trabajos temporales
+    /// </summary>
+    public static async Task<List<PlanContratista>> SeedPlanesContratistasAsync(IApplicationDbContext context)
+    {
+        if (await context.PlanesContratistas.AnyAsync())
+        {
+            return await context.PlanesContratistas.ToListAsync();
+        }
+
+        var planes = new List<PlanContratista>
+        {
+            PlanContratista.Create("Plan Básico Contratista", 300.00m),
+            PlanContratista.Create("Plan Profesional Contratista", 800.00m),
+            PlanContratista.Create("Plan Premium Contratista", 1500.00m)
+        };
+
+        context.PlanesContratistas.AddRange(planes);
+        await context.SaveChangesAsync(default);
+
+        return planes;
+    }
+
+    /// <summary>
+    /// Crea las deducciones TSS (Tesorería de la Seguridad Social) de República Dominicana
+    /// Incluye: AFP (pensión), SFS (salud), SRL (riesgos laborales)
+    /// </summary>
+    public static async Task SeedDeduccionesTssAsync(IApplicationDbContext context)
+    {
+        if (await context.DeduccionesTss.AnyAsync())
+        {
+            return; // Ya existen deducciones TSS
+        }
+
+        var deducciones = new List<DeduccionTss>
+        {
+            DeduccionTss.Create(
+                descripcion: "AFP (Fondo de Pensiones)", 
+                porcentaje: 2.87m),
+            
+            DeduccionTss.Create(
+                descripcion: "SFS (Seguro Familiar)", 
+                porcentaje: 3.04m),
+            
+            DeduccionTss.Create(
+                descripcion: "SRL (Riesgos Laborales)", 
+                porcentaje: 1.20m),
+            
+            DeduccionTss.Create(
+                descripcion: "INFOTEP (Formación Técnica)", 
+                porcentaje: 1.00m)
+        };
+
+        context.DeduccionesTss.AddRange(deducciones);
+        await context.SaveChangesAsync();
     }
 
     /// <summary>

@@ -77,9 +77,14 @@ public sealed class ReciboHeader : AggregateRoot
 
     /// <summary>
     /// Colección de detalles (líneas) del recibo.
+    /// Navigation property para EF Core (permite Include/ThenInclude).
     /// </summary>
-    private readonly List<ReciboDetalle> _detalles = new();
-    public IReadOnlyCollection<ReciboDetalle> Detalles => _detalles.AsReadOnly();
+    private List<ReciboDetalle> _detalles = new();
+    public ICollection<ReciboDetalle> Detalles 
+    { 
+        get => _detalles;
+        private set => _detalles = value?.ToList() ?? new List<ReciboDetalle>();
+    }
 
     // Constructor privado para EF Core
     private ReciboHeader()
@@ -87,7 +92,54 @@ public sealed class ReciboHeader : AggregateRoot
     }
 
     /// <summary>
-    /// Crea un nuevo recibo de pago.
+    /// Crea un nuevo recibo de pago (sobrecarga simplificada para tests/integraciones).
+    /// </summary>
+    /// <param name="userId">ID del empleador.</param>
+    /// <param name="empleadoId">ID del empleado.</param>
+    /// <param name="fechaPago">Fecha efectiva del pago.</param>
+    /// <param name="conceptoPago">Concepto general del pago.</param>
+    /// <returns>Nueva instancia de ReciboHeader.</returns>
+    public static ReciboHeader Create(
+        string userId,
+        int empleadoId,
+        DateTime fechaPago,
+        string conceptoPago)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("El ID del usuario es requerido", nameof(userId));
+
+        if (empleadoId <= 0)
+            throw new ArgumentException("El ID del empleado debe ser mayor a cero", nameof(empleadoId));
+
+        if (string.IsNullOrWhiteSpace(conceptoPago))
+            throw new ArgumentException("El concepto de pago es requerido", nameof(conceptoPago));
+
+        var recibo = new ReciboHeader
+        {
+            UserId = userId,
+            EmpleadoId = empleadoId,
+            ConceptoPago = conceptoPago.Trim(),
+            Tipo = 1, // Nómina Regular por defecto
+            Estado = 1, // Pendiente
+            FechaRegistro = DateTime.UtcNow,
+            FechaPago = fechaPago,
+            TotalIngresos = 0,
+            TotalDeducciones = 0,
+            NetoPagar = 0
+        };
+
+        recibo.RaiseDomainEvent(new ReciboGeneradoEvent(
+            recibo.PagoId,
+            recibo.UserId,
+            recibo.EmpleadoId,
+            recibo.ConceptoPago,
+            recibo.FechaRegistro));
+
+        return recibo;
+    }
+
+    /// <summary>
+    /// Crea un nuevo recibo de pago con opciones completas.
     /// </summary>
     /// <param name="userId">ID del empleador.</param>
     /// <param name="empleadoId">ID del empleado.</param>
@@ -96,7 +148,7 @@ public sealed class ReciboHeader : AggregateRoot
     /// <param name="periodoInicio">Inicio del período.</param>
     /// <param name="periodoFin">Fin del período.</param>
     /// <returns>Nueva instancia de ReciboHeader.</returns>
-    public static ReciboHeader Create(
+    public static ReciboHeader CreateWithOptions(
         string userId,
         int empleadoId,
         string conceptoPago,

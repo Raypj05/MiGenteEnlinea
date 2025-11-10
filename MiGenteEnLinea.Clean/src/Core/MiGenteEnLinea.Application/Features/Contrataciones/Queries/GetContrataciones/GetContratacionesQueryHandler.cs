@@ -58,7 +58,8 @@ public class GetContratacionesQueryHandler : IRequestHandler<GetContratacionesQu
 
         if (request.SoloActivas == true)
         {
-            query = query.Where(c => c.Estatus == 3); // En Progreso
+            // Activas = Aceptada (2) o EnProgreso (5)
+            query = query.Where(c => c.Estatus == 2 || c.Estatus == 5);
         }
 
         if (request.SoloNoCalificadas == true)

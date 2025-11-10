@@ -18,17 +18,8 @@ namespace MiGenteEnLinea.IntegrationTests.Controllers;
 /// Prueba el workflow completo de contratación:
 /// 1. Create (Pendiente) → 2. Accept/Reject → 3. Start → 4. Complete/Cancel
 /// </summary>
-[Collection("Sequential")]
-public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFactory>
-{
-    private readonly HttpClient _client;
-    private readonly TestWebApplicationFactory _factory;
-
-    public ContratacionesControllerTests(TestWebApplicationFactory factory)
-    {
-        _factory = factory;
-        _client = factory.CreateClient();
-    }
+[Collection("IntegrationTests")]
+public class ContratacionesControllerTests : IntegrationTestBase{public ContratacionesControllerTests(TestWebApplicationFactory factory) : base(factory){}
 
     #region Create Contratacion Tests
 
@@ -49,7 +40,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/contrataciones", command);
+        var response = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -71,7 +62,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/contrataciones", command);
+        var response = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -90,7 +81,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/contrataciones", command);
+        var response = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -109,7 +100,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/contrataciones", command);
+        var response = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -128,7 +119,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/contrataciones", command);
+        var response = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -149,11 +140,11 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 1500m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         // Act
-        var response = await _client.GetAsync($"/api/contrataciones/{detalleId}");
+        var response = await Client.AsEmpleador().GetAsync($"/api/contrataciones/{detalleId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -169,7 +160,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
     public async Task GetById_WithNonExistingId_ReturnsNotFound()
     {
         // Act
-        var response = await _client.GetAsync("/api/contrataciones/999999");
+        var response = await Client.AsEmpleador().GetAsync("/api/contrataciones/999999");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -197,11 +188,11 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(4)),
             MontoAcordado = 2000m
         };
-        await _client.PostAsJsonAsync("/api/contrataciones", command1);
-        await _client.PostAsJsonAsync("/api/contrataciones", command2);
+        await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command1);
+        await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command2);
 
         // Act
-        var response = await _client.GetAsync("/api/contrataciones");
+        var response = await Client.AsEmpleador().GetAsync("/api/contrataciones");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -221,10 +212,10 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(2)),
             MontoAcordado = 1000m
         };
-        await _client.PostAsJsonAsync("/api/contrataciones", command);
+        await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
 
         // Act
-        var response = await _client.GetAsync("/api/contrataciones?estatus=1"); // Pendiente
+        var response = await Client.AsEmpleador().GetAsync("/api/contrataciones?estatus=1"); // Pendiente
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -237,7 +228,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
     public async Task GetAll_WithPagination_ReturnsPagedResults()
     {
         // Act
-        var response = await _client.GetAsync("/api/contrataciones?pageNumber=1&pageSize=10");
+        var response = await Client.AsEmpleador().GetAsync("/api/contrataciones?pageNumber=1&pageSize=10");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -261,17 +252,17 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         // Act
-        var response = await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        var response = await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify estado cambió a Aceptada (2)
-        var getResponse = await _client.GetAsync($"/api/contrataciones/{detalleId}");
+        var getResponse = await Client.AsEmpleador().GetAsync($"/api/contrataciones/{detalleId}");
         var contratacion = await getResponse.Content.ReadFromJsonAsync<ContratacionDto>();
         contratacion!.Estatus.Should().Be(2); // Aceptada
     }
@@ -287,12 +278,12 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
 
         // Act - intentar aceptar de nuevo
-        var response = await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        var response = await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -302,7 +293,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
     public async Task Accept_WithNonExistingId_ReturnsNotFound()
     {
         // Act
-        var response = await _client.PutAsync("/api/contrataciones/999999/accept", null);
+        var response = await Client.AsEmpleador().PutAsync("/api/contrataciones/999999/accept", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -323,7 +314,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         var rejectCommand = new RejectContratacionCommand
@@ -333,13 +324,13 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId}/reject", rejectCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId}/reject", rejectCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify estado cambió a Rechazada (6)
-        var getResponse = await _client.GetAsync($"/api/contrataciones/{detalleId}");
+        var getResponse = await Client.AsEmpleador().GetAsync($"/api/contrataciones/{detalleId}");
         var contratacion = await getResponse.Content.ReadFromJsonAsync<ContratacionDto>();
         contratacion!.Estatus.Should().Be(6); // Rechazada
     }
@@ -355,7 +346,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         var rejectCommand = new RejectContratacionCommand
@@ -365,7 +356,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId}/reject", rejectCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId}/reject", rejectCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -382,9 +373,9 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
 
         var rejectCommand = new RejectContratacionCommand
         {
@@ -393,7 +384,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId}/reject", rejectCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId}/reject", rejectCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -410,7 +401,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync("/api/contrataciones/999999/reject", rejectCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync("/api/contrataciones/999999/reject", rejectCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -431,18 +422,18 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
 
         // Act
-        var response = await _client.PutAsync($"/api/contrataciones/{detalleId}/start", null);
+        var response = await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/start", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify estado cambió a EnProgreso (5)
-        var getResponse = await _client.GetAsync($"/api/contrataciones/{detalleId}");
+        var getResponse = await Client.AsEmpleador().GetAsync($"/api/contrataciones/{detalleId}");
         var contratacion = await getResponse.Content.ReadFromJsonAsync<ContratacionDto>();
         contratacion!.Estatus.Should().Be(5); // EnProgreso
         contratacion.FechaInicioReal.Should().NotBeNull();
@@ -459,11 +450,11 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         // Act
-        var response = await _client.PutAsync($"/api/contrataciones/{detalleId}/start", null);
+        var response = await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/start", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -473,7 +464,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
     public async Task Start_WithNonExistingId_ReturnsNotFound()
     {
         // Act
-        var response = await _client.PutAsync("/api/contrataciones/999999/start", null);
+        var response = await Client.AsEmpleador().PutAsync("/api/contrataciones/999999/start", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -494,19 +485,19 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/start", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/start", null);
 
         // Act
-        var response = await _client.PutAsync($"/api/contrataciones/{detalleId}/complete", null);
+        var response = await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/complete", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify estado cambió a Completada (4)
-        var getResponse = await _client.GetAsync($"/api/contrataciones/{detalleId}");
+        var getResponse = await Client.AsEmpleador().GetAsync($"/api/contrataciones/{detalleId}");
         var contratacion = await getResponse.Content.ReadFromJsonAsync<ContratacionDto>();
         contratacion!.Estatus.Should().Be(4); // Completada
         contratacion.FechaFinalizacionReal.Should().NotBeNull();
@@ -524,12 +515,12 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
 
         // Act
-        var response = await _client.PutAsync($"/api/contrataciones/{detalleId}/complete", null);
+        var response = await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/complete", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -539,7 +530,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
     public async Task Complete_WithNonExistingId_ReturnsNotFound()
     {
         // Act
-        var response = await _client.PutAsync("/api/contrataciones/999999/complete", null);
+        var response = await Client.AsEmpleador().PutAsync("/api/contrataciones/999999/complete", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -560,7 +551,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         var cancelCommand = new CancelContratacionCommand
@@ -570,13 +561,13 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId}/cancel", cancelCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId}/cancel", cancelCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Verify estado cambió a Cancelada (3)
-        var getResponse = await _client.GetAsync($"/api/contrataciones/{detalleId}");
+        var getResponse = await Client.AsEmpleador().GetAsync($"/api/contrataciones/{detalleId}");
         var contratacion = await getResponse.Content.ReadFromJsonAsync<ContratacionDto>();
         contratacion!.Estatus.Should().Be(3); // Cancelada
     }
@@ -592,7 +583,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
 
         var cancelCommand = new CancelContratacionCommand
@@ -602,7 +593,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId}/cancel", cancelCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId}/cancel", cancelCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -619,10 +610,10 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var response1 = await _client.PostAsJsonAsync("/api/contrataciones", command1);
+        var response1 = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command1);
         var detalleId1 = await response1.Content.ReadFromJsonAsync<int>();
-        var cancel1 = new CancelContratacionCommand { DetalleId = detalleId1, Motivo = "Test" };
-        var cancelResponse1 = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId1}/cancel", cancel1);
+        var cancel1 = new CancelContratacionCommand { DetalleId = detalleId1, Motivo = "Test motivo cancelacion (minimo 10 caracteres)" };
+        var cancelResponse1 = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId1}/cancel", cancel1);
         cancelResponse1.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Test cancelación desde Aceptada
@@ -633,11 +624,11 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var response2 = await _client.PostAsJsonAsync("/api/contrataciones", command2);
+        var response2 = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command2);
         var detalleId2 = await response2.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId2}/accept", null);
-        var cancel2 = new CancelContratacionCommand { DetalleId = detalleId2, Motivo = "Test" };
-        var cancelResponse2 = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId2}/cancel", cancel2);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId2}/accept", null);
+        var cancel2 = new CancelContratacionCommand { DetalleId = detalleId2, Motivo = "Cancelacion desde estado Aceptada (test)" };
+        var cancelResponse2 = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId2}/cancel", cancel2);
         cancelResponse2.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Test cancelación desde EnProgreso
@@ -648,12 +639,12 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var response3 = await _client.PostAsJsonAsync("/api/contrataciones", command3);
+        var response3 = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command3);
         var detalleId3 = await response3.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId3}/accept", null);
-        await _client.PutAsync($"/api/contrataciones/{detalleId3}/start", null);
-        var cancel3 = new CancelContratacionCommand { DetalleId = detalleId3, Motivo = "Test" };
-        var cancelResponse3 = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId3}/cancel", cancel3);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId3}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId3}/start", null);
+        var cancel3 = new CancelContratacionCommand { DetalleId = detalleId3, Motivo = "Cancelacion desde estado EnProgreso (test)" };
+        var cancelResponse3 = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId3}/cancel", cancel3);
         cancelResponse3.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -668,11 +659,11 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", createCommand);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", createCommand);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/start", null);
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/complete", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/start", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/complete", null);
 
         var cancelCommand = new CancelContratacionCommand
         {
@@ -681,7 +672,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/contrataciones/{detalleId}/cancel", cancelCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync($"/api/contrataciones/{detalleId}/cancel", cancelCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -698,7 +689,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
         };
 
         // Act
-        var response = await _client.PutAsJsonAsync("/api/contrataciones/999999/cancel", cancelCommand);
+        var response = await Client.AsEmpleador().PutAsJsonAsync("/api/contrataciones/999999/cancel", cancelCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -719,7 +710,7 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        await _client.PostAsJsonAsync("/api/contrataciones", command1);
+        await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command1);
 
         var command2 = new CreateContratacionCommand
         {
@@ -728,12 +719,12 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 3000m
         };
-        var response2 = await _client.PostAsJsonAsync("/api/contrataciones", command2);
+        var response2 = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command2);
         var detalleId2 = await response2.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId2}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId2}/accept", null);
 
         // Act
-        var response = await _client.GetAsync("/api/contrataciones/pendientes");
+        var response = await Client.AsEmpleador().GetAsync("/api/contrataciones/pendientes");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -745,26 +736,53 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
     [Fact]
     public async Task GetActivas_ReturnsOnlyActivasContrataciones()
     {
-        // Arrange - crear contrataciones activas (Aceptada o EnProgreso)
-        var command = new CreateContratacionCommand
+        // Arrange - Create unique user to isolate test data
+        var (userId, email, token, empleadorId) = await CreateEmpleadorAsync(
+            nombre: "Test",
+            apellido: "Activas"
+        );
+        
+        var client = Client.AsEmpleador(userId: userId);
+        
+        // Create contratación Aceptada
+        var command1 = new CreateContratacionCommand
         {
-            DescripcionCorta = "Test Activas",
+            DescripcionCorta = "Test Activas - Aceptada",
             FechaInicio = DateOnly.FromDateTime(DateTime.Now.AddDays(1)),
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", command);
-        var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        var createResponse1 = await client.PostAsJsonAsync("/api/contrataciones", command1);
+        var detalleId1 = await createResponse1.Content.ReadFromJsonAsync<int>();
+        await client.PutAsync($"/api/contrataciones/{detalleId1}/accept", null);
+
+        // Create contratación EnProgreso
+        var command2 = new CreateContratacionCommand
+        {
+            DescripcionCorta = "Test Activas - EnProgreso",
+            FechaInicio = DateOnly.FromDateTime(DateTime.Now.AddDays(1)),
+            FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
+            MontoAcordado = 2000m
+        };
+        var createResponse2 = await client.PostAsJsonAsync("/api/contrataciones", command2);
+        var detalleId2 = await createResponse2.Content.ReadFromJsonAsync<int>();
+        await client.PutAsync($"/api/contrataciones/{detalleId2}/accept", null);
+        await client.PutAsync($"/api/contrataciones/{detalleId2}/start", null);
 
         // Act
-        var response = await _client.GetAsync("/api/contrataciones/activas");
+        var response = await client.GetAsync("/api/contrataciones/activas");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var contrataciones = await response.Content.ReadFromJsonAsync<List<ContratacionDto>>();
         contrataciones.Should().NotBeNull();
-        contrataciones!.All(c => c.Estatus == 2 || c.Estatus == 5).Should().BeTrue(); // Aceptada o EnProgreso
+        contrataciones.Should().NotBeEmpty();
+        
+        // Verify ALL returned contrataciones are either Aceptada (2) or EnProgreso (5)
+        contrataciones!.All(c => c.Estatus == 2 || c.Estatus == 5).Should().BeTrue();
+        
+        // Verify endpoint returns activas contrataciones
+        contrataciones!.Should().ContainItemsAssignableTo<ContratacionDto>();
     }
 
     [Fact]
@@ -778,14 +796,14 @@ public class ContratacionesControllerTests : IClassFixture<TestWebApplicationFac
             FechaFinal = DateOnly.FromDateTime(DateTime.Now.AddDays(3)),
             MontoAcordado = 2000m
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/contrataciones", command);
+        var createResponse = await Client.AsEmpleador().PostAsJsonAsync("/api/contrataciones", command);
         var detalleId = await createResponse.Content.ReadFromJsonAsync<int>();
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/accept", null);
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/start", null);
-        await _client.PutAsync($"/api/contrataciones/{detalleId}/complete", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/accept", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/start", null);
+        await Client.AsEmpleador().PutAsync($"/api/contrataciones/{detalleId}/complete", null);
 
         // Act
-        var response = await _client.GetAsync("/api/contrataciones/sin-calificar");
+        var response = await Client.AsEmpleador().GetAsync("/api/contrataciones/sin-calificar");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);

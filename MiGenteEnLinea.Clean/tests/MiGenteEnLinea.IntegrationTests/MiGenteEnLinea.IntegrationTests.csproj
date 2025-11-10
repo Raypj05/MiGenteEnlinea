@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Presentation\MiGenteEnLinea.API\MiGenteEnLinea.API.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\MiGenteEnLinea.Infrastructure\MiGenteEnLinea.Infrastructure.csproj" />
   </ItemGroup>
 
   <!-- Copy appsettings.Testing.json to output directory -->

@@ -32,26 +32,13 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         // Configurar JSON options para serialización consistente
         Client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         
-        // Obtener DbContext para poder hacer seed de datos y assertions
+        // Obtener DbContext para poder hacer assertions y queries directos cuando sea necesario
         var scope = factory.Services.CreateScope();
         DbContext = scope.ServiceProvider.GetRequiredService<MiGenteDbContext>();
         AppDbContext = DbContext; // MiGenteDbContext implementa IApplicationDbContext
         
-        // Seedear datos de prueba automáticamente
-        SeedTestData().GetAwaiter().GetResult();
-    }
-    
-    /// <summary>
-    /// Seedea datos de prueba en la base de datos SQL Server
-    /// </summary>
-    private async Task SeedTestData()
-    {
-        // ⚠️ USUARIOS: Cada test debe crear sus propios usuarios con Identity
-        // Esto asegura que el password hashing sea consistente
-        
-        // ✅ CATALOGS: Seed de datos de catálogos (Planes, TSS) que todos los tests necesitan
-        await TestDataSeeder.SeedPlanesAsync(AppDbContext);
-        await TestDataSeeder.SeedDeduccionesTssAsync(AppDbContext);
+        // ✅ NO SEED AQUÍ - TestWebApplicationFactory ya hizo cleanup + seed UNA SOLA VEZ
+        // ✅ USUARIOS: Cada test crea sus propios usuarios usando CreateContratistaAsync() o CreateEmpleadorAsync()
     }
 
     /// <summary>
@@ -170,6 +157,150 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
     }
 
     /// <summary>
+    /// Helper para crear un Contratista completo usando el API.
+    /// 1. Registra usuario con tipo Contratista
+    /// 2. Activa cuenta automáticamente
+    /// 3. Hace login y obtiene token
+    /// 4. Crea perfil de contratista usando POST /api/contratistas
+    /// RETORNA: (userId, email, token, contratistaId)
+    /// </summary>
+    protected async Task<(string UserId, string Email, string Token, int ContratistaId)> CreateContratistaAsync(
+        string? nombre = null,
+        string? apellido = null,
+        string? identificacion = null,
+        string? titulo = null)
+    {
+        // ✅ GAP-010: RegisterCommand auto-creates Contratista profile
+        // No need to POST /api/contratistas (endpoint doesn't exist)
+        // Just register user and get the auto-created profile
+        
+        // PASO 1: Register user (auto-creates Contratista profile)
+        var email = GenerateUniqueEmail("contratista");
+        var password = "Test123!";
+        var (userId, emailUsado) = await RegisterUserAsync(
+            email, 
+            password, 
+            "Contratista", 
+            nombre ?? "TestContratista",
+            apellido ?? "Apellido",
+            identificacion ?? GenerateRandomIdentification()
+        );
+        
+        // PASO 2: Login to get token
+        var token = await LoginAsync(emailUsado, password);
+        
+        // PASO 3: Get the auto-created Contratista profile
+        var client = Client;
+        client.DefaultRequestHeaders.Authorization = 
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            
+        var response = await client.GetAsync($"/api/contratistas/by-user/{userId}");
+        response.EnsureSuccessStatusCode();
+        
+        var contratistaDto = await response.Content.ReadFromJsonAsync<JsonElement>();
+        
+        // Try both camelCase and PascalCase
+        var hasId = contratistaDto.TryGetProperty("contratistaId", out var idProp);
+        if (!hasId) hasId = contratistaDto.TryGetProperty("ContratistaId", out idProp);
+        
+        var contratistaId = hasId ? idProp.GetInt32() : throw new InvalidOperationException("ContratistaId not found in response");
+        
+        return (userId, emailUsado, token, contratistaId);
+    }
+    
+    /// <summary>
+    /// Helper para crear un Empleador completo usando el API.
+    /// Similar a CreateContratistaAsync pero para Empleadores.
+    /// RETORNA: (userId, email, token, empleadorId)
+    /// </summary>
+    protected async Task<(string UserId, string Email, string Token, int EmpleadorId)> CreateEmpleadorAsync(
+        string? nombre = null,
+        string? apellido = null,
+        string? nombreEmpresa = null,
+        string? rnc = null)
+    {
+        // PASO 1: Register user
+        var email = GenerateUniqueEmail("empleador");
+        var password = "Test123!";
+        var (userId, emailUsado) = await RegisterUserAsync(
+            email, 
+            password, 
+            "Empleador", 
+            nombre ?? "TestEmpleador",
+            apellido ?? "Apellido"
+        );
+        
+        // PASO 2: Login to get token
+        var token = await LoginAsync(emailUsado, password);
+        
+        // PASO 3: Create Empleador profile via API (with authentication)
+        var authenticatedClient = Client.AsEmpleador(userId: userId);
+        
+        // CreateEmpleadorCommand solo requiere UserId (otros campos opcionales)
+        var createRequest = new
+        {
+            userId = userId,
+            habilidades = "Test habilidades",
+            experiencia = "5 años",
+            descripcion = $"Empleador de prueba: {nombre} {apellido}"
+        };
+        
+        var response = await authenticatedClient.PostAsJsonAsync("/api/empleadores", createRequest);
+        response.EnsureSuccessStatusCode();
+        
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        
+        // Try both property name casings (API might return empleadorId or EmpleadorId)
+        var hasId = result.TryGetProperty("empleadorId", out var idProp);
+        if (!hasId) hasId = result.TryGetProperty("EmpleadorId", out idProp);
+        
+        var empleadorId = idProp.GetInt32();
+        
+        return (userId, emailUsado, token, empleadorId);
+    }
+
+    /// <summary>
+    /// Helper para crear un Empleado completo usando el API.
+    /// Requiere un empleadorUserId existente.
+    /// RETORNA: empleadoId
+    /// </summary>
+    protected async Task<int> CreateEmpleadoAsync(
+        string empleadorUserId,
+        string? nombre = null,
+        string? apellido = null,
+        decimal? salario = null)
+    {
+        var client = Client.AsEmpleador(userId: empleadorUserId);
+        
+        var command = new
+        {
+            userId = empleadorUserId,
+            identificacion = GenerateRandomIdentification(),
+            nombre = nombre ?? "TestEmpleado",
+            apellido = apellido ?? "Apellido",
+            fechaInicio = DateTime.Now,
+            posicion = "Empleado",
+            salario = salario ?? 45000m,
+            periodoPago = 3, // Mensual
+            tss = true,
+            telefono1 = "8091234567",
+            direccion = "Calle Test #123",
+            provincia = "Santo Domingo"
+        };
+        
+        var response = await client.PostAsJsonAsync("/api/empleados", command);
+        response.EnsureSuccessStatusCode();
+        
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        
+        // Try both property name casings
+        var hasId = result.TryGetProperty("empleadoId", out var idProp);
+        if (!hasId) hasId = result.TryGetProperty("EmpleadoId", out idProp);
+        
+        return idProp.GetInt32();
+    }
+
+    /// <summary>
     /// Genera una identificación aleatoria (cédula dominicana simulada)
     /// </summary>
     protected string GenerateRandomIdentification()
@@ -177,6 +308,16 @@ public abstract class IntegrationTestBase : IClassFixture<TestWebApplicationFact
         var random = new Random();
         // Formato: XXX-XXXXXXX-X (11 dígitos)
         return $"{random.Next(100, 999)}{random.Next(1000000, 9999999)}{random.Next(0, 9)}";
+    }
+    
+    /// <summary>
+    /// Genera un RNC aleatorio (para empleadores)
+    /// </summary>
+    protected string GenerateRandomRNC()
+    {
+        var random = new Random();
+        // Formato: 1-XX-XXXXX-X (9 dígitos)
+        return $"1{random.Next(10, 99)}{random.Next(10000, 99999)}{random.Next(0, 9)}";
     }
 
     /// <summary>

@@ -115,7 +115,11 @@ public class ProcesarNominaLoteCommandHandler : IRequestHandler<ProcesarNominaLo
                     periodoFin: DateOnly.FromDateTime(request.FechaPago)
                 );
 
-                // Agregar ingresos y deducciones al recibo usando métodos del aggregate
+                // ✅ PASO 1: Guardar el header PRIMERO para obtener el PagoId
+                await _unitOfWork.RecibosHeader.AddAsync(reciboHeader);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+                // ✅ PASO 2: AHORA agregar ingresos y deducciones (con PagoId válido)
                 // Salario base
                 reciboHeader.AgregarIngreso("Salario Base", empleadoItem.Salario);
 
@@ -135,8 +139,7 @@ public class ProcesarNominaLoteCommandHandler : IRequestHandler<ProcesarNominaLo
                 // Recalcular totales
                 reciboHeader.RecalcularTotales();
 
-                // Guardar en base de datos
-                await _unitOfWork.RecibosHeader.AddAsync(reciboHeader);
+                // ✅ PASO 3: Guardar de nuevo para persistir detalles y totales actualizados
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 // Actualizar contadores

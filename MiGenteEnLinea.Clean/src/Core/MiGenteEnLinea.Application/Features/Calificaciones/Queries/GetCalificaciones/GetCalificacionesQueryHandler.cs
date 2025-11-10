@@ -26,10 +26,42 @@ public class GetCalificacionesQueryHandler : IRequestHandler<GetCalificacionesQu
             request.Identificacion,
             request.UserId);
 
-        // TODO: Implementar lógica real cuando exista vista o join
-        // Por ahora retornamos lista vacía
-        _logger.LogWarning("GetCalificaciones not fully implemented - returning empty list");
-        
-        return new List<CalificacionVistaDto>();
+        // Query base: Join Calificaciones con VistaPerfil para obtener nombre del calificador
+        var query = from calificacion in _context.Calificaciones.AsNoTracking()
+                    join perfil in _context.VPerfiles.AsNoTracking()
+                    on calificacion.EmpleadorUserId equals perfil.UserId
+                    select new { calificacion, perfil };
+
+        // Filtrar por identificación del contratista si se proporciona
+        if (!string.IsNullOrWhiteSpace(request.Identificacion))
+        {
+            query = query.Where(x => x.calificacion.ContratistaIdentificacion == request.Identificacion);
+        }
+
+        // Filtrar por userId si se proporciona
+        if (!string.IsNullOrWhiteSpace(request.UserId))
+        {
+            query = query.Where(x => x.calificacion.EmpleadorUserId == request.UserId);
+        }
+
+        var calificaciones = await query
+            .OrderByDescending(x => x.calificacion.Fecha)
+            .Select(x => new CalificacionVistaDto
+            {
+                CalificacionId = x.calificacion.Id,
+                UserId = x.calificacion.EmpleadorUserId,
+                Identificacion = x.calificacion.ContratistaIdentificacion,
+                Puntuacion = (x.calificacion.Puntualidad + x.calificacion.Cumplimiento + 
+                             x.calificacion.Conocimientos + x.calificacion.Recomendacion) / 4,
+                Comentario = null, // Legacy field - no hay comentarios en domain model
+                FechaCreacion = x.calificacion.Fecha,
+                NombreCalificador = x.perfil.Nombre ?? string.Empty,
+                ApellidoCalificador = x.perfil.Apellido ?? string.Empty
+            })
+            .ToListAsync(cancellationToken);
+
+        _logger.LogInformation("Se encontraron {Count} calificaciones", calificaciones.Count);
+
+        return calificaciones;
     }
 }

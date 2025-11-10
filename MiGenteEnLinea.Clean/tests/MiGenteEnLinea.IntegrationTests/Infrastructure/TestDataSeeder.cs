@@ -62,7 +62,7 @@ public static class TestDataSeeder
     }
 
     /// <summary>
-    /// Seed completo: Planes + Usuarios (Empleadores y Contratistas) + Deducciones TSS
+    /// Seed completo: Planes + Usuarios (Empleadores y Contratistas) + Deducciones TSS + OpenAI Config
     /// </summary>
     public static async Task SeedAllAsync(IApplicationDbContext context)
     {
@@ -73,6 +73,7 @@ public static class TestDataSeeder
         await SeedPlanesAsync(context);
         await SeedPlanesContratistasAsync(context);
         await SeedDeduccionesTssAsync(context);
+        await SeedOpenAiConfigAsync(context);
         await SeedUsuariosAsync(context);
     }
 
@@ -175,20 +176,42 @@ public static class TestDataSeeder
 
     /// <summary>
     /// Crea múltiples empleadores y contratistas con IDs predecibles para tests
-    /// IDs: test-empleador-001 a test-empleador-119, test-empleador-301 a test-empleador-307
-    ///      test-contratista-201 a test-contratista-210, test-contratista-305
+    /// 
+    /// ⚠️ RANGOS RESERVADOS PARA TESTS (NO USAR EN SEEDING):
+    /// - Empleadores: 501-599  (reservado para tests CreateEmpleador)
+    /// - Contratistas: 601-699 (reservado para tests CreateContratista)
+    /// 
+    /// ✅ RANGOS DE SEEDING (Disponibles para READ operations):
+    /// - test-empleador-001 a test-empleador-011 (11 empleadores)
+    /// - test-empleador-101 a test-empleador-119 (19 empleadores)
+    /// - test-empleador-301 a test-empleador-307 (7 empleadores)
+    /// - test-contratista-201 a test-contratista-219 (19 contratistas)
+    /// - test-contratista-401 a test-contratista-419 (19 contratistas)
+    /// 
+    /// Total: 37 empleadores + 38 contratistas = 75 usuarios de prueba
     /// </summary>
     public static async Task<(List<Empleador> empleadores, List<Contratista> contratistas)> SeedUsuariosAsync(IApplicationDbContext context)
     {
-        // ✅ IDEMPOTENCIA: Check if data already exists to avoid duplicate key errors
-        var existingEmpleadores = await context.Empleadores.AsNoTracking().ToListAsync();
-        var existingContratistas = await context.Contratistas.AsNoTracking().ToListAsync();
+        // ✅ IDEMPOTENCIA MEJORADA: Check for SPECIFIC test users, not ALL users
+        // Permite que el seeding coexista con datos de producción u otros tests
+        var testEmpleadores = await context.Empleadores
+            .Where(e => e.UserId.StartsWith("test-empleador-"))
+            .AsNoTracking()
+            .ToListAsync();
         
-        if (existingEmpleadores.Any() || existingContratistas.Any())
+        var testContratistas = await context.Contratistas
+            .Where(c => c.UserId.StartsWith("test-contratista-"))
+            .AsNoTracking()
+            .ToListAsync();
+        
+        // Solo skip si NUESTROS usuarios de prueba ya existen (no otros datos)
+        if (testEmpleadores.Any() || testContratistas.Any())
         {
-            Console.WriteLine($"⏭️ Skipping seeding: {existingEmpleadores.Count} empleadores and {existingContratistas.Count} contratistas already exist in database");
-            return (existingEmpleadores, existingContratistas);
+            Console.WriteLine($"⏭️ Test users already seeded: {testEmpleadores.Count} empleadores, {testContratistas.Count} contratistas");
+            return (testEmpleadores, testContratistas);
         }
+        
+        Console.WriteLine("🌱 Seeding test users (empleadores + contratistas)...");
         
         var planes = await context.PlanesEmpleadores.ToListAsync();
         var planesContratistas = await context.PlanesContratistas.ToListAsync();
@@ -357,6 +380,40 @@ public static class TestDataSeeder
         await context.SaveChangesAsync();
 
         contratistas.Add(contratista);
+    }
+
+    /// <summary>
+    /// Crea configuración de OpenAI para tests
+    /// 
+    /// **Contexto:**
+    /// - Tests de ConfiguracionController esperan que exista 1 registro en tabla OpenAi_Config
+    /// - Usado por el "abogado virtual" en el sistema Legacy
+    /// - API key dummy solo para testing
+    /// 
+    /// **SECURITY NOTE:**
+    /// Esta configuración es solo para testing. En producción, la API key debe estar en:
+    /// - Azure Key Vault
+    /// - appsettings.json (con User Secrets en dev)
+    /// - Variables de entorno
+    /// </summary>
+    public static async Task SeedOpenAiConfigAsync(IApplicationDbContext context)
+    {
+        if (await context.OpenAiConfigs.AnyAsync())
+        {
+            return;
+        }
+
+        var config = new Domain.Entities.Configuracion.OpenAiConfig
+        {
+            // Don't set Id - it's an IDENTITY column (auto-increment)
+            OpenAIApiKey = "test-api-key-for-integration-tests-sk-1234567890abcdef",
+            OpenAIApiUrl = "https://api.openai.com/v1"
+        };
+
+        context.OpenAiConfigs.Add(config);
+        await context.SaveChangesAsync();
+        
+        Console.WriteLine("✅ Seeded OpenAI configuration for tests");
     }
 
     /// <summary>

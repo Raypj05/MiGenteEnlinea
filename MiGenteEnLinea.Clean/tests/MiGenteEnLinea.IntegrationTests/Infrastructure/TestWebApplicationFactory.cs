@@ -26,6 +26,10 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     public Mock<IEmailService> EmailServiceMock { get; private set; } = new();
     public Mock<IPaymentService> PaymentServiceMock { get; private set; } = new();
     public Mock<IPadronService> PadronServiceMock { get; private set; } = new();
+    
+    // ✅ Flag para asegurar que la DB se inicializa solo UNA VEZ (migración + limpieza + seed)
+    private static bool _databaseInitialized = false;
+    private static readonly object _initializationLock = new object();
 
     public TestWebApplicationFactory()
     {
@@ -106,7 +110,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             PaymentServiceMock = new Mock<IPaymentService>();
             PaymentServiceMock
                 .Setup(x => x.GenerateIdempotencyKeyAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Guid.NewGuid().ToString());
+                .ReturnsAsync(() => $"ikey:{Guid.NewGuid()}"); // ✅ Cardnet format: "ikey:{GUID}"
             PaymentServiceMock
                 .Setup(x => x.ProcessPaymentAsync(It.IsAny<PaymentRequest>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new PaymentResult
@@ -116,7 +120,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     ResponseDescription = "Test payment approved",
                     ApprovalCode = "AUTH-" + DateTime.Now.Ticks.ToString().Substring(0, 6),
                     TransactionReference = "TEST-TXN-" + Guid.NewGuid().ToString().Substring(0, 8),
-                    IdempotencyKey = Guid.NewGuid().ToString()
+                    IdempotencyKey = $"ikey:{Guid.NewGuid()}" // ✅ Cardnet format: "ikey:{GUID}"
                 });
             services.AddScoped(_ => PaymentServiceMock.Object);
 
@@ -173,20 +177,40 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             });
 
             // ========================================
-            // PASO 6: Asegurar que la base de datos está creada con migraciones
+            // PASO 6: Inicializar base de datos - SOLO UNA VEZ (thread-safe)
+            // ⚠️ CRÍTICO: Lock para evitar race conditions cuando tests ejecutan en paralelo
             // ========================================
-            var sp = services.BuildServiceProvider();
-            using var scope = sp.CreateScope();
-            var scopedServices = scope.ServiceProvider;
-            var db = scopedServices.GetRequiredService<MiGenteDbContext>();
-            
-            // Aplicar migraciones pendientes
-            db.Database.Migrate();
-            
-            // ========================================
-            // PASO 7: Seed initial test data with predictable IDs
-            // ========================================
-            TestDataSeeder.SeedAllAsync(db).GetAwaiter().GetResult();
+            lock (_initializationLock)
+            {
+                if (!_databaseInitialized)
+                {
+                    var sp = services.BuildServiceProvider();
+                    using var scope = sp.CreateScope();
+                    var scopedServices = scope.ServiceProvider;
+                    var db = scopedServices.GetRequiredService<MiGenteDbContext>();
+                    
+                    Console.WriteLine("🔧 Inicializando base de datos de tests (SOLO UNA VEZ)...");
+                    
+                    // PASO 6.1: Aplicar migraciones pendientes (crea DB si no existe)
+                    Console.WriteLine("  ⏳ Aplicando migraciones...");
+                    db.Database.Migrate();
+                    
+                    // PASO 6.2: Limpiar datos de tests anteriores
+                    Console.WriteLine("  🧹 Limpiando datos de tests anteriores...");
+                    Helpers.DatabaseCleanupHelper.CleanupTestDataAsync(db).GetAwaiter().GetResult();
+                    
+                    // PASO 6.3: Seed initial reference data (Planes, TSS, etc.)
+                    Console.WriteLine("  🌱 Seeding reference data...");
+                    Infrastructure.TestDataSeeder.SeedAllAsync(db).GetAwaiter().GetResult();
+                    
+                    _databaseInitialized = true;
+                    Console.WriteLine("✅ Base de datos lista para tests");
+                }
+                else
+                {
+                    Console.WriteLine("✅ Base de datos ya inicializada (reutilizando)");
+                }
+            }
         });
     }
 

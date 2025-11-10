@@ -393,7 +393,7 @@ public class NominasController : ControllerBase
         return Ok(new
         {
             service = "Nominas API",
-            status = "healthy",
+            status = "Healthy", // Changed from "healthy" to "Healthy" for consistency with DashboardController
             version = "2.0.0",
             timestamp = DateTime.UtcNow,
             features = new[]

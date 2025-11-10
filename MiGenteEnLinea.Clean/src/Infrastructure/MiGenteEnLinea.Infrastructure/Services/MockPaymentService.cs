@@ -22,7 +22,8 @@ public class MockPaymentService : IPaymentService
 
     public Task<string> GenerateIdempotencyKeyAsync(CancellationToken ct = default)
     {
-        var idempotencyKey = Guid.NewGuid().ToString();
+        // ✅ Cardnet format: "ikey:{GUID}"
+        var idempotencyKey = $"ikey:{Guid.NewGuid()}";
         _logger.LogInformation("Mock: Generando idempotency key: {Key}", idempotencyKey);
         return Task.FromResult(idempotencyKey);
     }

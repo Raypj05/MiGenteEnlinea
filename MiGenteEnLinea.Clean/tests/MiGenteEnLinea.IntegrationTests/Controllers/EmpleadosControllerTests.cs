@@ -585,12 +585,13 @@ public class EmpleadosControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleado_FromDifferentUser_ReturnsForbidden()
     {
-        // Arrange: Create empleado as User A
-        var clientA = Client.AsEmpleador(userId: "test-empleador-userA");
+        // Arrange: Create User A (empleador) via API
+        var userA = await CreateEmpleadorAsync(nombre: "TestUserA", apellido: "ApellidoA");
+        var clientA = Client.AsEmpleador(userId: userA.UserId);
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = "test-empleador-userA",
+            UserId = userA.UserId,
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Carlos",
             Apellido = "Rodriguez",
@@ -608,14 +609,15 @@ public class EmpleadosControllerTests : IntegrationTestBase
         if (!hasId) hasId = createJson.TryGetProperty("EmpleadoId", out idProp);
         var empleadoId = idProp.GetInt32();
 
-        // Switch to User B (different user)
-        var clientB = Client.AsEmpleador(userId: "test-empleador-userB");
+        // Switch to User B (different empleador) - CREATE USER B FIRST via API
+        var userB = await CreateEmpleadorAsync(nombre: "TestUserB", apellido: "ApellidoB");
+        var clientB = Client.AsEmpleador(userId: userB.UserId);
 
         // Act: Try to update User A's empleado as User B
         var updateCommand = new UpdateEmpleadoCommand
         {
             EmpleadoId = empleadoId,
-            UserId = "test-empleador-userB", // Different user trying to update
+            UserId = userB.UserId, // Different user trying to update
             Nombre = "Hacked",
             Apellido = "Name",
             Salario = 99999m,
@@ -635,12 +637,13 @@ public class EmpleadosControllerTests : IntegrationTestBase
     [Fact]
     public async Task DarDeBajaEmpleado_FromDifferentUser_ReturnsForbidden()
     {
-        // Arrange: Create empleado as User A
-        var clientA = Client.AsEmpleador(userId: "test-empleador-userC");
+        // Arrange: Create User C (empleador) via API
+        var userC = await CreateEmpleadorAsync(nombre: "TestUserC", apellido: "ApellidoC");
+        var clientA = Client.AsEmpleador(userId: userC.UserId);
 
         var createCommand = new CreateEmpleadoCommand
         {
-            UserId = "test-empleador-userC",
+            UserId = userC.UserId,
             Identificacion = GenerateRandomIdentification(),
             Nombre = "Ana",
             Apellido = "Martinez",
@@ -658,10 +661,11 @@ public class EmpleadosControllerTests : IntegrationTestBase
         if (!hasId) hasId = createJson.TryGetProperty("EmpleadoId", out idProp);
         var empleadoId = idProp.GetInt32();
 
-        // Switch to User B (different user)
-        var clientB = Client.AsEmpleador(userId: "test-empleador-userD");
+        // Switch to User D (different empleador) - CREATE USER D FIRST via API
+        var userD = await CreateEmpleadorAsync(nombre: "TestUserD", apellido: "ApellidoD");
+        var clientB = Client.AsEmpleador(userId: userD.UserId);
 
-        // Act: Try to dar de baja User A's empleado as User B
+        // Act: Try to dar de baja User C's empleado as User D
         var bajaRequest = new
         {
             FechaBaja = DateTime.Now,
@@ -669,7 +673,7 @@ public class EmpleadosControllerTests : IntegrationTestBase
             Motivo = "Intento de terminación no autorizada"
         };
 
-        var response = await Client.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
+        var response = await clientB.PutAsJsonAsync($"/api/empleados/{empleadoId}/dar-de-baja", bajaRequest);
 
         // Assert: Should be Forbidden (or NotFound)
         response.StatusCode.Should().BeOneOf(

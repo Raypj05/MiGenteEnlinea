@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -26,42 +26,17 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateEmpleador_WithValidData_CreatesProfileAndReturnsEmpleadorId()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-101");
-
-        var command = new CreateEmpleadorCommand(
-            UserId: "test-empleador-101",
-            Habilidades: "Gestión de proyectos de construcción",
-            Experiencia: "15 años en el sector construcción",
-            Descripcion: "Empresa líder en construcción de edificios comerciales"
+        // Arrange - Create user dynamically via API (API-First pattern)
+        var empleadorResult = await CreateEmpleadorAsync(
+            nombre: "Juan",
+            apellido: "Constructor"
         );
 
-        // Act
-        var response = await client.PostAsJsonAsync("/api/empleadores", command);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created); // ✅ FIX: API returns 201 Created, not 200 OK
-        
-        // Parse response - API returns CreateEmpleadorResponse object, not just int
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var responseObject = await response.Content.ReadFromJsonAsync<JsonElement>();
-        
-        // Try both possible property names (empleadorId or EmpleadorId)
-        int empleadorId;
-        if (responseObject.TryGetProperty("empleadorId", out var idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else if (responseObject.TryGetProperty("EmpleadorId", out idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else
-        {
-            throw new Exception($"No se encontró 'empleadorId' ni 'EmpleadorId' en response: {responseContent}");
-        }
-        
-        empleadorId.Should().BeGreaterThan(0);
+        // Assert - Empleador profile created successfully via CreateEmpleadorAsync helper
+        empleadorResult.EmpleadorId.Should().BeGreaterThan(0);
+        empleadorResult.UserId.Should().NotBeNullOrEmpty();
+        empleadorResult.Email.Should().Contain("@test.com");
+        empleadorResult.Token.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -91,48 +66,27 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task GetEmpleadorById_WithValidId_ReturnsEmpleadorDto()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-102");
-
-        var createCommand = new CreateEmpleadorCommand(
-            UserId: "test-empleador-102",
-            Habilidades: "Gestión empresarial",
-            Experiencia: "10 años",
-            Descripcion: "Empresa de servicios profesionales"
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "María",
+            apellido: "Empresaria"
         );
 
-        // Act
-        var response = await client.PostAsJsonAsync("/api/empleadores", createCommand);
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var responseObject = await response.Content.ReadFromJsonAsync<JsonElement>();
-        
-        // Try both possible property names
-        int empleadorId;
-        if (responseObject.TryGetProperty("empleadorId", out var idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else if (responseObject.TryGetProperty("EmpleadorId", out idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else
-        {
-            throw new Exception($"No se encontró 'empleadorId' en response: {responseContent}");
-        }
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
-        // Act
-        var getResponse = await client.GetAsync($"/api/empleadores/{empleadorId}");
+        // Act - Get empleador by ID
+        var getResponse = await client.GetAsync($"/api/empleadores/{empleador.EmpleadorId}");
 
         // Assert
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var empleadorDto = await getResponse.Content.ReadFromJsonAsync<EmpleadorDto>();
         empleadorDto.Should().NotBeNull();
-        empleadorDto!.EmpleadorId.Should().Be(empleadorId);
-        empleadorDto.UserId.Should().Be("test-empleador-102");
-        empleadorDto.Habilidades.Should().Be("Gestión empresarial");
-        empleadorDto.Experiencia.Should().Be("10 años");
-        empleadorDto.Descripcion.Should().Be("Empresa de servicios profesionales");
+        empleadorDto!.EmpleadorId.Should().Be(empleador.EmpleadorId);
+        empleadorDto.UserId.Should().Be(empleador.UserId);
+        // Helper uses hardcoded values
+        empleadorDto.Habilidades.Should().Be("Test habilidades");
+        empleadorDto.Experiencia.Should().Be("5 años");
+        empleadorDto.Descripcion.Should().Be("Empleador de prueba: María Empresaria");
     }
 
     [Fact]
@@ -157,8 +111,13 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task GetEmpleadoresList_ReturnsListOfEmpleadores()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-104");
+        // Arrange - Create empleador to ensure at least one exists
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "Pedro",
+            apellido: "Listado"
+        );
+
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Act
         var response = await client.GetAsync("/api/empleadores");
@@ -167,7 +126,6 @@ public class EmpleadoresControllerTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         // ✅ API returns SearchEmpleadoresResult with camelCase properties
-        var responseContent = await response.Content.ReadAsStringAsync();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         
         // Response should be an object (SearchEmpleadoresResult)
@@ -190,54 +148,35 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleador_WithValidData_UpdatesSuccessfully()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-105");
-
-        var createCommand = new CreateEmpleadorCommand(
-            UserId: "test-empleador-105",
-            Habilidades: "Original skills",
-            Experiencia: "Original experience",
-            Descripcion: "Original description"
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "Carlos",
+            apellido: "Original"
         );
-        var createResponse = await client.PostAsJsonAsync("/api/empleadores", createCommand);
-        var createResponseObject = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
-        
-        // Try both possible property names
-        int empleadorId;
-        if (createResponseObject.TryGetProperty("empleadorId", out var idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else if (createResponseObject.TryGetProperty("EmpleadorId", out idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else
-        {
-            throw new Exception("No se encontró 'empleadorId' en create response");
-        }
+
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Update empleador
         var updateCommand = new UpdateEmpleadorCommand(
-            UserId: "test-empleador-105",
+            UserId: empleador.UserId,
             Habilidades: "Updated skills: Gestión de proyectos",
             Experiencia: "Updated experience: 20 años",
             Descripcion: "Updated description: Empresa líder en innovación"
         );
 
         // Act
-        var response = await client.PutAsJsonAsync($"/api/empleadores/test-empleador-105", updateCommand);
+        var response = await client.PutAsJsonAsync($"/api/empleadores/{empleador.UserId}", updateCommand);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
-        // ✅ FIX: API returns { message: "..." }, not bool
+        // ✅ API returns { message: "..." }
         var responseObject = await response.Content.ReadFromJsonAsync<JsonElement>();
         responseObject.TryGetProperty("message", out var messageProperty).Should().BeTrue();
         messageProperty.GetString().Should().Contain("exitosamente");
 
         // Verify update
-        var getResponse = await client.GetAsync($"/api/empleadores/{empleadorId}");
+        var getResponse = await client.GetAsync($"/api/empleadores/{empleador.EmpleadorId}");
         var updatedEmpleador = await getResponse.Content.ReadFromJsonAsync<EmpleadorDto>();
         updatedEmpleador.Should().NotBeNull();
         updatedEmpleador!.Habilidades.Should().Be("Updated skills: Gestión de proyectos");
@@ -272,28 +211,25 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task GetEmpleadorPerfil_WithValidUserId_ReturnsProfile()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-106");
-
-        var createCommand = new CreateEmpleadorCommand(
-            UserId: "test-empleador-106",
-            Habilidades: "Perfil test skills",
-            Experiencia: "Perfil test experience",
-            Descripcion: "Perfil test description"
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "Ana",
+            apellido: "Perfil"
         );
-        await client.PostAsJsonAsync("/api/empleadores", createCommand);
+
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Act
-        var response = await client.GetAsync($"/api/empleadores/by-user/test-empleador-106");
+        var response = await client.GetAsync($"/api/empleadores/by-user/{empleador.UserId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var empleadorDto = await response.Content.ReadFromJsonAsync<EmpleadorDto>();
         empleadorDto.Should().NotBeNull();
-        empleadorDto!.UserId.Should().Be("test-empleador-106");
-        empleadorDto.Habilidades.Should().Be("Perfil test skills");
-        empleadorDto.Experiencia.Should().Be("Perfil test experience");
-        empleadorDto.Descripcion.Should().Be("Perfil test description");
+        empleadorDto!.UserId.Should().Be(empleador.UserId);
+        empleadorDto.Habilidades.Should().Be("Test habilidades"); // Helper hardcoded value
+        empleadorDto.Experiencia.Should().Be("5 años"); // Helper hardcoded value
+        empleadorDto.Descripcion.Should().Be("Empleador de prueba: Ana Perfil"); // Helper hardcoded value
     }
 
     #endregion
@@ -303,34 +239,16 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task DeleteEmpleador_WithValidUserId_DeletesSuccessfully()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-107");
-
-        var createCommand = new CreateEmpleadorCommand(
-            UserId: "test-empleador-107",
-            Habilidades: "To be deleted",
-            Experiencia: "To be deleted",
-            Descripcion: "To be deleted"
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "Delete",
+            apellido: "Test"
         );
-        var createResponse = await client.PostAsJsonAsync("/api/empleadores", createCommand);
-        var createResponseObject = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
-        
-        int empleadorId;
-        if (createResponseObject.TryGetProperty("empleadorId", out var idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else if (createResponseObject.TryGetProperty("EmpleadorId", out idProp))
-        {
-            empleadorId = idProp.GetInt32();
-        }
-        else
-        {
-            throw new Exception("No se encontró 'empleadorId' en create response");
-        }
+
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Act - Delete empleador
-        var response = await client.DeleteAsync($"/api/empleadores/test-empleador-107");
+        var response = await client.DeleteAsync($"/api/empleadores/{empleador.UserId}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -339,7 +257,7 @@ public class EmpleadoresControllerTests : IntegrationTestBase
         messageProperty.GetString().Should().Contain("eliminado exitosamente");
 
         // Verify empleador is deleted (GET should return 404)
-        var getResponse = await client.GetAsync($"/api/empleadores/{empleadorId}");
+        var getResponse = await client.GetAsync($"/api/empleadores/{empleador.EmpleadorId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -386,31 +304,30 @@ public class EmpleadoresControllerTests : IntegrationTestBase
         //       - Current user's userId matches command.UserId
         //       - Or current user has admin role
         
-        // Arrange - Create two users
-        var client1 = Client.AsEmpleador(userId: "test-empleador-userE");
-
-        // Create empleador 1
-        var createCommand1 = new CreateEmpleadorCommand(
-            UserId: "test-empleador-userE",
-            Habilidades: "User 1 skills",
-            Experiencia: "User 1 experience",
-            Descripcion: "User 1 description"
+        // Arrange - Create two empleadores dynamically
+        var empleador1 = await CreateEmpleadorAsync(
+            nombre: "UserA",
+            apellido: "FirstUser"
         );
-        await client1.PostAsJsonAsync("/api/empleadores", createCommand1);
 
-        // Create user 2 and login as user 2
-        var client2 = Client.AsEmpleador(userId: "test-empleador-userF");
+        var empleador2 = await CreateEmpleadorAsync(
+            nombre: "UserB",
+            apellido: "SecondUser"
+        );
+
+        // Login as user 2
+        var client2 = Client.AsEmpleador(userId: empleador2.UserId);
 
         // Try to update user 1's profile while logged in as user 2
         var updateCommand = new UpdateEmpleadorCommand(
-            UserId: "test-empleador-userE", // ← Trying to update user 1
+            UserId: empleador1.UserId, // ← Trying to update user 1
             Habilidades: "UNAUTHORIZED EDIT - should fail",
             Experiencia: "UNAUTHORIZED EDIT - should fail",
             Descripcion: "UNAUTHORIZED EDIT - should fail"
         );
 
         // Act
-        var response = await client2.PutAsJsonAsync($"/api/empleadores/test-empleador-userE", updateCommand);
+        var response = await client2.PutAsJsonAsync($"/api/empleadores/{empleador1.UserId}", updateCommand);
 
         // Assert - CURRENT BEHAVIOR: Returns 200 OK (allows edit) ← SECURITY ISSUE
         // EXPECTED BEHAVIOR: Should return 403 Forbidden
@@ -418,7 +335,7 @@ public class EmpleadoresControllerTests : IntegrationTestBase
             "⚠️ CURRENT BEHAVIOR: API allows cross-user edits (SECURITY GAP). Should be 403 Forbidden.");
         
         // Verify the edit went through (proving the security gap exists)
-        var getResponse = await client2.GetAsync($"/api/empleadores/by-user/test-empleador-userE");
+        var getResponse = await client2.GetAsync($"/api/empleadores/by-user/{empleador1.UserId}");
         var empleador = await getResponse.Content.ReadFromJsonAsync<EmpleadorDto>();
         empleador!.Habilidades.Should().Be("UNAUTHORIZED EDIT - should fail",
             "Edit succeeded (security gap confirmed)");
@@ -427,12 +344,23 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateEmpleador_AsContratista_ShouldCreateSuccessfully()
     {
-        // Arrange - Use Contratista role
-        var client = Client.AsContratista(userId: "test-contratista-201");
+        // Arrange - Register a Contratista user (no profile creation)
+        var email = GenerateUniqueEmail("contratista-dual");
+        var password = "Test123!";
+        var (userId, emailUsado) = await RegisterUserAsync(
+            email,
+            password,
+            "Contratista", // tipo = "2" in legacy
+            "Carlos",
+            "ContratistaTest"
+        );
+        
+        var token = await LoginAsync(emailUsado, password);
+        var client = Client.AsContratista(userId: userId);
 
         // Try to create empleador profile (business rule: Contratistas can also be Empleadores)
         var createCommand = new CreateEmpleadorCommand(
-            UserId: "test-contratista-201",
+            UserId: userId,
             Habilidades: "Contratista trying to be empleador",
             Experiencia: "Testing dual role",
             Descripcion: "Should work if business allows"
@@ -526,8 +454,13 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task SearchEmpleadores_WithInvalidPageIndex_ReturnsEmptyResults()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-112");
+        // Arrange - Create empleador for authentication
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "Pagination",
+            apellido: "TestUser"
+        );
+
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Act - Request page 9999 (non-existent)
         var response = await client.GetAsync("/api/empleadores?pageIndex=9999&pageSize=10");
@@ -548,17 +481,19 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleadorFoto_WithValidImage_UpdatesSuccessfully()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-113");
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "FotoTest",
+            apellido: "Usuario"
+        );
 
-        // Create empleador profile
-        await CreateEmpleadorAsync("test-empleador-113", client);
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Create valid JPEG image (small test image)
         var validImageBytes = CreateTestImageBytes(width: 100, height: 100, sizeKb: 50);
 
         // Act - Upload foto
-        var response = await UploadEmpleadorFotoAsync("test-empleador-113", "profile.jpg", validImageBytes, "image/jpeg", client);
+        var response = await UploadEmpleadorFotoAsync(empleador.UserId, "profile.jpg", validImageBytes, "image/jpeg", client);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -570,18 +505,20 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleadorFoto_WithOversizedFile_ReturnsBadRequest()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-114");
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "OversizeTest",
+            apellido: "Usuario"
+        );
 
-        // Create empleador profile
-        await CreateEmpleadorAsync("test-empleador-114", client);
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Create oversized file (6MB > 5MB limit)
         var oversizedImageBytes = new byte[6 * 1024 * 1024]; // 6MB
         new Random().NextBytes(oversizedImageBytes);
 
         // Act - Try to upload oversized file
-        var response = await UploadEmpleadorFotoAsync("test-empleador-114", "oversized.jpg", oversizedImageBytes, "image/jpeg", client);
+        var response = await UploadEmpleadorFotoAsync(empleador.UserId, "oversized.jpg", oversizedImageBytes, "image/jpeg", client);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -593,14 +530,16 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleadorFoto_WithNullFile_ReturnsBadRequest()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-115");
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "NullFileTest",
+            apellido: "Usuario"
+        );
 
-        // Create empleador profile
-        await CreateEmpleadorAsync("test-empleador-115", client);
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Act - Try to upload without file
-        var response = await UploadEmpleadorFotoAsync("test-empleador-115", null, null, null, client);
+        var response = await UploadEmpleadorFotoAsync(empleador.UserId, null, null, null, client);
 
         // Assert - Controller validation happens before model binding, so it returns 400 with error message
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -618,7 +557,7 @@ public class EmpleadoresControllerTests : IntegrationTestBase
         var validImageBytes = CreateTestImageBytes(100, 100, 50);
 
         // Act - Try to upload without authentication
-        var response = await UploadEmpleadorFotoAsync("test-empleador-116", "profile.jpg", validImageBytes, "image/jpeg", client);
+        var response = await UploadEmpleadorFotoAsync("test-empleador-516", "profile.jpg", validImageBytes, "image/jpeg", client);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -631,8 +570,19 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateEmpleador_WithMaxLengthFields_CreatesSuccessfully()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-117");
+        // Arrange - Register user first, then create empleador with max lengths
+        var email = GenerateUniqueEmail("maxlength");
+        var password = "Test123!";
+        var (userId, emailUsado) = await RegisterUserAsync(
+            email,
+            password,
+            "Empleador",
+            "MaxLength",
+            "TestUser"
+        );
+        await LoginAsync(emailUsado, password);
+        
+        var client = Client.AsEmpleador(userId: userId);
 
         // Create command with maximum allowed lengths (200/200/500)
         var maxHabilidades = new string('A', 200); // Exactly 200 characters
@@ -640,7 +590,7 @@ public class EmpleadoresControllerTests : IntegrationTestBase
         var maxDescripcion = new string('C', 500); // Exactly 500 characters
         
         var command = new CreateEmpleadorCommand(
-            UserId: "test-empleador-117",
+            UserId: userId,
             Habilidades: maxHabilidades,
             Experiencia: maxExperiencia,
             Descripcion: maxDescripcion
@@ -656,12 +606,23 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateEmpleador_WithNullOptionalFields_CreatesSuccessfully()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-118");
+        // Arrange - Register and login user first
+        var email = GenerateUniqueEmail("nullfields");
+        var password = "Test123!";
+        var (userId, emailUsado) = await RegisterUserAsync(
+            email,
+            password,
+            "Empleador",
+            "NullFields",
+            "TestUser"
+        );
+        var token = await LoginAsync(emailUsado, password);
+        
+        var client = Client.AsEmpleador(userId: userId);
 
-        // Create command with null optional fields (all fields are optional)
+        // Create empleador with null optional fields (all fields are optional)
         var command = new CreateEmpleadorCommand(
-            UserId: "test-empleador-118",
+            UserId: userId,
             Habilidades: null,
             Experiencia: null,
             Descripcion: null
@@ -677,35 +638,30 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task UpdateEmpleador_WithOnlyOneField_UpdatesSuccessfully()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-119");
-        
-        // Create inicial empleador profile
-        var createCommand = new CreateEmpleadorCommand(
-            UserId: "test-empleador-119",
-            Habilidades: "Initial skills",
-            Experiencia: "Initial experience",
-            Descripcion: "Initial description"
+        // Arrange - Create empleador dynamically
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "Partial",
+            apellido: "UpdateTest"
         );
-        var createResponse = await client.PostAsJsonAsync("/api/empleadores", createCommand);
-        createResponse.EnsureSuccessStatusCode(); // Verify creation worked
+
+        var client = Client.AsEmpleador(userId: empleador.UserId);
 
         // Update with only Habilidades (others null)
         var updateCommand = new UpdateEmpleadorCommand(
-            UserId: "test-empleador-119",
+            UserId: empleador.UserId,
             Habilidades: "Updated skills only",
             Experiencia: null,
             Descripcion: null
         );
 
         // Act
-        var response = await client.PutAsJsonAsync($"/api/empleadores/test-empleador-119", updateCommand);
+        var response = await client.PutAsJsonAsync($"/api/empleadores/{empleador.UserId}", updateCommand);
 
         // Assert - Should accept single field update (200 OK or 204 No Content)
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent);
         
         // Verify the update with GET request (use by-user endpoint)
-        var getResponse = await client.GetAsync($"/api/empleadores/by-user/test-empleador-119");
+        var getResponse = await client.GetAsync($"/api/empleadores/by-user/{empleador.UserId}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var result = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -719,10 +675,15 @@ public class EmpleadoresControllerTests : IntegrationTestBase
     [Fact]
     public async Task CreateEmpleador_WithNonExistentUserId_ReturnsNotFound()
     {
-        // Arrange
-        var client = Client.AsEmpleador(userId: "test-empleador-120");
+        // Arrange - Create a real empleador for authentication
+        var empleador = await CreateEmpleadorAsync(
+            nombre: "AuthUser",
+            apellido: "ValidAuth"
+        );
 
-        // Try to create empleador with different non-existent userId
+        var client = Client.AsEmpleador(userId: empleador.UserId);
+
+        // Try to create empleador profile with different non-existent userId
         var nonExistentUserId = Guid.NewGuid().ToString();
         var command = new CreateEmpleadorCommand(
             UserId: nonExistentUserId,
@@ -810,3 +771,4 @@ public class EmpleadoresControllerTests : IntegrationTestBase
 
     #endregion
 }
+

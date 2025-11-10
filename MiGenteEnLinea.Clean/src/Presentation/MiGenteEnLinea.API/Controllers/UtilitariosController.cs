@@ -90,20 +90,27 @@ public class UtilitariosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConvertirNumeroALetras(
-        [FromQuery] decimal numero,
+        [FromQuery] decimal? numero, // Made nullable to properly validate required parameter
         [FromQuery] bool incluirMoneda = false) // Default false: solo número sin moneda
     {
+        // Validate required parameter
+        if (!numero.HasValue)
+        {
+            _logger.LogWarning("Intento de conversión sin número especificado");
+            return BadRequest(new { error = "El parámetro 'numero' es requerido" });
+        }
+
         try
         {
             _logger.LogInformation(
                 "GAP-020: Convirtiendo número {Numero} a letras. IncluirMoneda={IncluirMoneda}",
-                numero,
+                numero.Value,
                 incluirMoneda);
 
             // Crear query y enviar a MediatR
             var query = new Application.Features.Utilitarios.Queries.ConvertirNumeroALetras.ConvertirNumeroALetrasQuery
             {
-                Numero = numero,
+                Numero = numero.Value, // Use .Value since numero is now nullable
                 IncluirMoneda = incluirMoneda
             };
 
@@ -111,13 +118,13 @@ public class UtilitariosController : ControllerBase
 
             _logger.LogInformation(
                 "Conversión exitosa: {Numero} → {Texto}",
-                numero,
+                numero.Value,
                 texto);
 
             // FIX: Retornar todas las propiedades como string para Dictionary<string, string>
             return Ok(new
             {
-                numero = numero.ToString("0.##"), // Convert to string with max 2 decimals
+                numero = numero.Value.ToString("0.##"), // Convert to string with max 2 decimals
                 texto,
                 incluirMoneda = incluirMoneda.ToString().ToLower() // Convert bool to "true"/"false"
             });
@@ -125,7 +132,7 @@ public class UtilitariosController : ControllerBase
         catch (FluentValidation.ValidationException validationEx)
         {
             // FIX: Manejar ValidationException explícitamente para retornar 400
-            _logger.LogWarning(validationEx, "Errores de validación al convertir número: {Numero}", numero);
+            _logger.LogWarning(validationEx, "Errores de validación al convertir número: {Numero}", numero.Value);
             
             var errors = validationEx.Errors
                 .Select(e => new { field = e.PropertyName, message = e.ErrorMessage })

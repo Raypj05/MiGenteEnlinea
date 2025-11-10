@@ -327,8 +327,12 @@ public class DashboardControllerTests : IClassFixture<TestWebApplicationFactory>
         var health2 = await response2.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         var health3 = await response3.Content.ReadFromJsonAsync<Dictionary<string, object>>();
 
-        health1!["status"].Should().Be(health2!["status"]);
-        health2["status"].Should().Be(health3!["status"]);
+        // Convert JSON elements to strings for comparison
+        health1!["status"].ToString().Should().Be(health2!["status"].ToString());
+        health2["status"].ToString().Should().Be(health3!["status"].ToString());
+        
+        // Verify all return "Healthy"
+        health1["status"].ToString().Should().Be("Healthy");
     }
 
     #endregion

@@ -1,0 +1,185 @@
+@{
+    ViewData["Title"] = "Menú Principal";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h4>Menú Principal</h4>
+
+<div class="row container bg-white p-3">
+    <!-- Card de Pagos -->
+    <div class="card col col-md-3 col-12 border-1 m-1">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <label>PAGOS</label>
+                </div>
+                <div class="col-4 text-end">
+                    <img src="~/images/payIcon.png" alt="Ícono" class="img-fluid" style="max-height: 40px;">
+                </div>
+                <label style="font-weight: bold">$0.00</label>
+            </div>
+        </div>
+        <div class="card-body">
+            <label style="color: darkgray">Historial de Pagos Realizados</label>
+        </div>
+    </div>
+
+    <!-- Card de Empleados -->
+    <div class="card col col-md-3 col-12 border-1 m-1">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <label>EMPLEADOS</label>
+                </div>
+                <div class="col-4 text-end">
+                    <img src="~/images/employee.png" alt="Ícono" class="img-fluid" style="max-height: 40px;">
+                </div>
+                <label style="font-weight: bold">@(ViewBag.EmpleadosActivos ?? 0)</label>
+            </div>
+        </div>
+        <div class="card-body">
+            <label style="color: darkgray">Nomina Actual de Empleados</label>
+        </div>
+    </div>
+
+    <!-- Card de Calificaciones -->
+    <div class="card col col-md-3 col-12 border-1 m-1">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <label>CALIFICACIONES</label>
+                </div>
+                <div class="col-4 text-end">
+                    <img src="~/images/star.png" alt="Ícono" class="img-fluid" style="max-height: 40px;">
+                </div>
+                <label style="font-weight: bold">0</label>
+            </div>
+        </div>
+        <div class="card-body">
+            <label style="color: darkgray">Calificaciones Completadas</label>
+        </div>
+    </div>
+</div>
+
+<!-- Enlaces Rápidos -->
+<div class="row container bg-white p-3 mt-2 align-content-center justify-content-center">
+    <div class="col col-md-3 col-12">
+        <a href="@Url.Action("Colaboradores", "Empleador")" class="btn btn-primary w-100">
+            <i class="bi bi-people-fill"></i> Colaboradores
+        </a>
+    </div>
+    <div class="col col-md-3 col-12">
+        <a href="@Url.Action("Calificaciones", "Empleador")" class="btn btn-primary w-100">
+            <i class="bi bi-star"></i> Calificación de Perfiles
+        </a>
+    </div>
+    <div class="col col-md-3 col-12">
+        <a href="@Url.Action("Index", "Home")" class="btn btn-primary w-100">
+            <i class="bi bi-people"></i> Comunidad
+        </a>
+    </div>
+</div>
+
+<!-- Historial de Pagos -->
+<div class="row container bg-white p-3 mt-2">
+    <h4>Historial de Pagos</h4>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="3" class="text-center text-muted">No hay pagos registrados</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Gráfico de Calificaciones -->
+<div class="row container bg-white p-3 mt-2">
+    <h4>Gráfico de Calificaciones Completadas</h4>
+    <div id="ratingChart" style="height: 300px;"></div>
+</div>
+
+<!-- Estadísticas en Gráfico -->
+<div class="row container bg-white p-3 mt-2">
+    <h4>Estadísticas de Actividad</h4>
+    <div id="activityChart" style="height: 300px;"></div>
+</div>
+
+@section Scripts {
+    <!-- ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
+    <script>
+        // Gráfico de Calificaciones
+        var ratingOptions = {
+            chart: {
+                type: 'bar',
+                height: 300
+            },
+            series: [{
+                name: 'Calificaciones',
+                data: [30, 40, 50, 60, 70, 80]
+            }],
+            xaxis: {
+                categories: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio']
+            },
+            colors: ['#007bff']
+        };
+
+        var ratingChart = new ApexCharts(document.querySelector("#ratingChart"), ratingOptions);
+        ratingChart.render();
+
+        // Gráfico de Actividad
+        var activityOptions = {
+            chart: {
+                type: 'line',
+                height: 300
+            },
+            series: [{
+                name: 'Usuarios Activos',
+                data: [12, 25, 34, 46, 56, 70]
+            }],
+            xaxis: {
+                categories: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Semana 5', 'Semana 6']
+            },
+            colors: ['#28a745'],
+            stroke: {
+                curve: 'smooth'
+            }
+        };
+
+        var activityChart = new ApexCharts(document.querySelector("#activityChart"), activityOptions);
+        activityChart.render();
+
+        // Mostrar mensajes con SweetAlert2
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <text>
+            Swal.fire({
+                title: 'Error',
+                text: '@TempData["ErrorMessage"]',
+                icon: 'error',
+                confirmButtonText: 'Aceptar'
+            });
+            </text>
+        }
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <text>
+            Swal.fire({
+                title: 'Éxito',
+                text: '@TempData["SuccessMessage"]',
+                icon: 'success',
+                confirmButtonText: 'Aceptar'
+            });
+            </text>
+        }
+    </script>
+}

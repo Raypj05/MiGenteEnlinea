@@ -3,26 +3,29 @@ using MiGenteEnLinea.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add services to the container
 builder.Services.AddControllersWithViews();
+builder.Services.AddHttpContextAccessor();
 
-// Configurar sesiones
+// Configure session
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromHours(8);
+    options.IdleTimeout = TimeSpan.FromHours(
+        builder.Configuration.GetValue<int>("Session:IdleTimeoutHours", 8));
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.Name = builder.Configuration["Session:CookieName"] ?? ".MiGente.Session";
 });
 
-// Configurar autenticación con cookies
+// Configure authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.LoginPath = "/Auth/Login";
         options.LogoutPath = "/Auth/Logout";
-        options.AccessDeniedPath = "/Auth/Login";
+        options.AccessDeniedPath = "/Auth/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
@@ -30,12 +33,17 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Strict;
     });
 
-// Configurar HttpClient para la API
+// Configure HttpClient for API (uses existing IApiService/ApiService)
 builder.Services.AddHttpClient<IApiService, ApiService>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5015");
-    client.Timeout = TimeSpan.FromSeconds(30);
+    var baseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "https://localhost:5015";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue<int>("ApiSettings:Timeout", 30));
 });
+
+// Register authentication service
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 var app = builder.Build();
 

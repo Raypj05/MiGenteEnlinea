@@ -1,0 +1,90 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación de Compra</title>
+    <style>
+        /* Estilos generales */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333333;
+            margin-bottom: 20px;
+        }
+
+        p {
+            color: #666666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+            .logo img {
+                max-width: 200px;
+            }
+
+        @media only screen and (max-width: 480px) {
+            .container {
+                padding: 10px;
+                border-radius: 0;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .logo img {
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="http://platform.migenteenlinea.do/Images/logoMiGene.png" />
+        </div>
+        <h1>¡Hola #nombre#!</h1>
+        <p>Gracias por adquirir uno de nuestros planes</p>
+        <p>A continuación, se muestran los detalles de la transacción:</p>
+        <ul>
+            <li><strong>Producto:</strong> #plan#</li>
+            <li><strong>Precio:</strong> #precio#</li>
+            <li><strong>Fecha de compra:</strong> #fecha#</li>
+            <li><strong>ID de transacción:</strong>#transaccion#</li>
+
+        </ul>
+        <p>Para cualquier consulta o soporte, no dudes en contactarnos.</p>
+        <p>¡Gracias nuevamente por tu compra!</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación de Registro</title>
+    <style>
+        /* Estilos generales */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333333;
+            margin-bottom: 20px;
+        }
+
+        p {
+            color: #666666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+            .logo img {
+                max-width: 200px;
+            }
+
+        @media only screen and (max-width: 480px) {
+            .container {
+                padding: 10px;
+                border-radius: 0;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .logo img {
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="http://platform.migenteenlinea.do/Images/logoMiGene.png" />
+        </div>
+        <h1>¡Hola #nombre# Es una lastima que no recuerdes tu acceso!</h1>
+        <p>Por suerte aqui estamos para ayudarte.</p>
+        <p>Con el siguiente enlace podras reestablecer tu contraseña:</p>
+        <p>
+            <a href="#linkActivar#" style="padding: 12px 24px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 4px;">Reestablecer Contraseña</a>
+        </p>
+        <p>Si no puedes hacer clic en el botón, copia y pega la siguiente URL en tu navegador:</p>
+        <p>#linkActivar#</p>
+        <p>¡Esperamos verte pronto en Mi Gente en Línea!</p>
+    </div>
+</body>
+</html>

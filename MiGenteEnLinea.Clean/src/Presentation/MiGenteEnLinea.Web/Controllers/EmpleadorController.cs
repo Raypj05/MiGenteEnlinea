@@ -17,6 +17,43 @@ namespace MiGenteEnLinea.Web.Controllers
             _logger = logger;
         }
 
+        #region Dashboard
+
+        /// <summary>
+        /// GET: /Empleador/Index
+        /// Main dashboard for Empleador
+        /// </summary>
+        public async Task<IActionResult> Index()
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var tipo = User.FindFirst("tipo")?.Value;
+
+                if (string.IsNullOrEmpty(userId) || tipo != "1")
+                {
+                    _logger.LogWarning("Usuario no autorizado intentó acceder al dashboard empleador");
+                    return RedirectToAction("Login", "Auth");
+                }
+
+                // Get dashboard statistics
+                var empleadosResponse = await _apiService.GetEmpleadosAsync(userId, activo: true);
+                
+                ViewBag.EmpleadosActivos = empleadosResponse.Success ? empleadosResponse.Data?.Count ?? 0 : 0;
+                ViewBag.UserName = User.Identity?.Name ?? "Usuario";
+
+                return View();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading empleador dashboard for user {UserId}", User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                TempData["ErrorMessage"] = "Error al cargar el dashboard. Intente nuevamente.";
+                return View();
+            }
+        }
+
+        #endregion
+
         #region Calificaciones
 
         /// <summary>

@@ -1,0 +1,194 @@
+@{
+    ViewData["Title"] = "Menú Principal";
+    Layout = "~/Views/Shared/_LayoutPlatform.cshtml";
+}
+        .info-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .icon-large {
+            font-size: 3rem;
+            opacity: 0.3;
+        }
+        .quick-action-btn {
+            margin: 5px;
+        }
+    </style>
+}
+
+<div class="pagetitle">
+    <h1>Dashboard Empleador</h1>
+    <nav>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="@Url.Action("Index", "Empleador")">Inicio</a></li>
+            <li class="breadcrumb-item active">Dashboard</li>
+        </ol>
+    </nav>
+</div>
+
+<section class="section dashboard">
+    <div class="row">
+        <!-- Left side columns -->
+        <div class="col-lg-8">
+            <div class="row">
+                <!-- Empleados Activos Card -->
+                <div class="col-xxl-4 col-md-6">
+                    <div class="card info-box bg-primary text-white info-card">
+                        <div class="card-body">
+                            <h5 class="card-title text-white">Colaboradores Activos</h5>
+                            <div class="d-flex align-items-center">
+                                <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                    <i class="bi bi-people icon-large"></i>
+                                </div>
+                                <div class="ps-3">
+                                    <h6 class="display-4">@ViewBag.EmpleadosActivos</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nómina Card -->
+                <div class="col-xxl-4 col-md-6">
+                    <div class="card info-box bg-success text-white info-card">
+                        <div class="card-body">
+                            <h5 class="card-title text-white">Nómina del Mes</h5>
+                            <div class="d-flex align-items-center">
+                                <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                    <i class="bi bi-cash-stack icon-large"></i>
+                                </div>
+                                <div class="ps-3">
+                                    <h6 class="display-6">-</h6>
+                                    <span class="small">Pendiente</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calificaciones Card -->
+                <div class="col-xxl-4 col-md-6">
+                    <div class="card info-box bg-info text-white info-card">
+                        <div class="card-body">
+                            <h5 class="card-title text-white">Calificaciones</h5>
+                            <div class="d-flex align-items-center">
+                                <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                    <i class="bi bi-star-fill icon-large"></i>
+                                </div>
+                                <div class="ps-3">
+                                    <h6 class="display-6">-</h6>
+                                    <span class="small">Promedio</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions Card -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Acciones Rápidas</h5>
+                            <div class="d-flex flex-wrap">
+                                <a href="@Url.Action("Colaboradores", "Empleador")" class="btn btn-primary quick-action-btn">
+                                    <i class="bi bi-people me-1"></i> Ver Colaboradores
+                                </a>
+                                <a href="@Url.Action("Calificaciones", "Empleador")" class="btn btn-warning quick-action-btn">
+                                    <i class="bi bi-star me-1"></i> Calificar Perfiles
+                                </a>
+                                <a href="/Home/Comunidad" class="btn btn-info quick-action-btn">
+                                    <i class="bi bi-search me-1"></i> Buscar Profesionales
+                                </a>
+                                <a href="@Url.Action("MiPerfil", "Empleador")" class="btn btn-secondary quick-action-btn">
+                                    <i class="bi bi-person me-1"></i> Mi Perfil
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Actividad Reciente</h5>
+                            <div class="activity">
+                                <div class="activity-item d-flex">
+                                    <div class="activite-label">Hoy</div>
+                                    <i class='bi bi-circle-fill activity-badge text-success align-self-start'></i>
+                                    <div class="activity-content">
+                                        Bienvenido a <strong>MiGente En Línea</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Right side columns -->
+        <div class="col-lg-4">
+
+            <!-- Suscripción Card -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Mi Suscripción</h5>
+                    <div class="text-center">
+                        <i class="bi bi-shield-check text-success" style="font-size: 3rem;"></i>
+                        <p class="mt-3">Plan Activo</p>
+                        <a href="@Url.Action("MiSuscripcion", "Empleador")" class="btn btn-sm btn-outline-primary">
+                            Ver Detalles
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ayuda Rápida -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">¿Necesitas Ayuda?</h5>
+                    <p class="small">Accede a nuestra sección de preguntas frecuentes o contacta con soporte.</p>
+                    <a href="/Home/FAQ" class="btn btn-sm btn-outline-secondary w-100 mb-2">
+                        <i class="bi bi-question-circle me-1"></i> Preguntas Frecuentes
+                    </a>
+                    <a href="mailto:soporte@migenteenlinea.do" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="bi bi-envelope me-1"></i> Contactar Soporte
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        // Show success message if present
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <text>
+            Swal.fire({
+                icon: 'success',
+                title: '¡Éxito!',
+                text: '@TempData["SuccessMessage"]',
+                confirmButtonText: 'Aceptar'
+            });
+            </text>
+        }
+
+        // Show error message if present
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <text>
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: '@TempData["ErrorMessage"]',
+                confirmButtonText: 'Aceptar'
+            });
+            </text>
+        }
+    </script>
+}

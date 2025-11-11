@@ -67,6 +67,6 @@ app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Auth}/{action=Login}/{id?}"); // Cambiar default a Login
+    pattern: "{controller=Home}/{action=Index}/{id?}"); // Landing page como default
 
 app.Run();
